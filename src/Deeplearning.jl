@@ -1,7 +1,6 @@
 module Deeplearning
 	using Pkg
 	!(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
-	using CuArrays
 	using AutoGrad
 	using LinearAlgebra
 
