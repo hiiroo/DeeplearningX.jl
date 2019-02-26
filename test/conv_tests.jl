@@ -22,7 +22,7 @@ module MyTestModule
 
         i1 = i1'
         i1 = reshape(i1, (10,10,1))
-        i1 = cu(i1)
+        i1 = @cudaarray i1
 
         function mytestfunction()
                 eo = [  0.  0.  0.  0.  0.  0.  0.  0.;
