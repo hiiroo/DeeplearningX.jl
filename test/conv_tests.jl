@@ -1,6 +1,7 @@
 module MyTestModule
+        using Pkg
+        !(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
         using Deeplearning
-        using CuArrays
         using Test
         
 
