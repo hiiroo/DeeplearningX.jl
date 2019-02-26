@@ -1,4 +1,6 @@
 *.jl.cov
 *.jl.*.cov
 *.jl.mem
+*-checkpoint.ipynb
+.ipynb_checkpoints/*
 deps/deps.jl
