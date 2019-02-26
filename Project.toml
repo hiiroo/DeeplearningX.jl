@@ -6,17 +6,13 @@ version = "0.1.0"
 [deps]
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
-CUDAapi = "3895d2a7-ec45-59b8-82bb-cfc6a382f9b3"
-CUDAdrv = "c5f51814-7f29-56b8-a69c-e4d8f6be1fde"
-CUDAnative = "be33ccc6-a3ff-5ff2-a52e-74243cff1e17"
-CuArrays = "3a865a2d-5b23-5a0f-bc46-62713ec82fae"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 RDatasets = "ce6b1742-4840-55fa-b093-852dadbb1d8b"
 AutoGrad = "6710c13c-97f1-543f-91c5-74e8f7d95b35"
 
 [compat]
-CSV ="0.4.3"
+CSV ="0.4"
 CUDAapi="0.5.4"
 CUDAdrv="1.0.1"
 CUDAnative="1.0.1"
