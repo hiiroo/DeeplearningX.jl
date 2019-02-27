@@ -1,4 +1,4 @@
-module MyTestModule
+module ConvolutionTests
         using Pkg
         !(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
         using Deeplearning
@@ -56,7 +56,7 @@ module MyTestModule
                         6. 5. 5. 5.;
                         3. 2. 2. 2.  ]
 
-                conv = Main.MyTestModule.@convolve i1 w (1,1) (3,3)
+                conv = @convolve i1 w (1,1) (3,3)
                 @test conv(i1)[:,:,1]' == eo
         end
 
@@ -64,7 +64,7 @@ module MyTestModule
                 eo = [  5. 5.;
                         5. 5. ]
 
-                conv = Main.MyTestModule.@convolve i1 w (1,1) (4,4)
+                conv = @convolve i1 w (1,1) (4,4)
                 @test conv(i1)[:,:,1]' == eo
         end
 
