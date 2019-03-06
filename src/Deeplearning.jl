@@ -158,7 +158,7 @@ module Deeplearning
         margin = input_size.%kernel_size
 
 	    y = reshape(map(opidx->maximum(input[opidx]), poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
-	    return y
+	    return @cudaarray y
 	end
 
 	function maxpoolx(input, window, strides, dilations, dy, y)
@@ -170,7 +170,7 @@ module Deeplearning
 	    opidxs = poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)
 	    dx = zeros(input_size)
 	    map(opidxp->dx[opidxp[1]]=opidxp[2], zip(opidxs,y))
-	    return dx
+	    return @cudaarray dx
 	end
 
 	@primitive maxpool(input, window, strides, dilations),dy,y maxpoolx(input, window, strides, dilations, y, dy)
