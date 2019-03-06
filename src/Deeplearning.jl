@@ -9,7 +9,7 @@ module Deeplearning
 
 	macro createarray(sz)
 	    quote
-	        a = rand(Float64, $(esc(sz)))
+	        a = rand(Float32, $(esc(sz)))
 	        (haskey(Pkg.installed(), "CuArrays")) ? cu(a) : a
 	    end
 	end
@@ -151,55 +151,55 @@ module Deeplearning
 	end
 	@zerograd poolidxs(op::Function, input, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int})
 
-	function maxpool(input, window, strides, dilations)
+	function maxpool(input, fmforw, fmback, window, strides, dilations)
 	    input_size = size(input)
 	    kernel_size = _kernelsize(window, dilations)
 	    fm_size = _featuremapsize(input_size, kernel_size, strides)
         margin = input_size.%kernel_size
 
-	    y = reshape(map(opidx->maximum(input[opidx]), poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
-	    return y
+	    fmforw[:] = reshape(map(opidx->maximum(input[opidx]), poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)[:]
+	    return fmforw
 	end
 
-	function maxpoolx(input, window, strides, dilations, dy, y)
+	function maxpoolx(input, fmforw, fmback, window, strides, dilations, dy, y)
 	    input_size = size(input)
 	    kernel_size = _kernelsize(strides, dilations)
 	    fm_size = _featuremapsize(input_size, kernel_size, strides)
         margin = input_size.%kernel_size
 
 	    opidxs = poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)
-	    dx = zeros(input_size)
-	    map(opidxp->dx[opidxp[1]]=opidxp[2], zip(opidxs,y))
-	    return dx
+	    # dx = zeros(input_size)
+	    map(opidxp->fmback[opidxp[1]]=opidxp[2], zip(opidxs,y))
+	    return fmback
 	end
 
-	@primitive maxpool(input, window, strides, dilations),dy,y maxpoolx(input, window, strides, dilations, y, dy)
-	@zerograd maxpoolx(input, window, strides, dilations, dy, y)
+	@primitive maxpool(input, fmforw, fmback, window, strides, dilations),dy,y maxpoolx(input, fmforw, fmback, window, strides, dilations, y, dy)
+	@zerograd maxpoolx(input, fmforw, fmback, window, strides, dilations, dy, y)
 
-	function avgpool(input, window, strides, dilations)
+	function avgpool(input, fmforw, fmback, window, strides, dilations)
 	    input_size = size(input)
 	    kernel_size = _kernelsize(window, dilations)
 	    fm_size = _featuremapsize(input_size, kernel_size, strides)
         margin = input_size.%kernel_size
 
-	    y = reshape(map(opidx->mean(input[opidx]), poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
-	    return @cudaarray y
+	    fmforw[:] = reshape(map(opidx->mean(input[opidx]), poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)[:]
+	    return fmforw
 	end
 
-	function avgpoolx(input, window, strides, dilations, dy, y)
+	function avgpoolx(input, fmforw, fmback, window, strides, dilations, dy, y)
 	    input_size = size(input)
 	    kernel_size = _kernelsize(window, dilations)
 	    fm_size = _featuremapsize(input_size, kernel_size, strides)
         margin = input_size.%kernel_size
 
 	    opidxs = poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)
-	    dx = zeros(input_size)
-	    map(opidxp->dx[opidxp[1]].=opidxp[2]/prod(kernel_size), zip(opidxs,y))
-	    return @cudaarray dx
+	    # dx = zeros(input_size)
+	    map(opidxp->fmback[opidxp[1]].=opidxp[2]/prod(kernel_size), zip(opidxs,y))
+	    return fmback
 	end
 
-	@primitive avgpool(input, strides, dilations),dy,y avgpoolx(input, strides, dilations, y, dy)
-	@zerograd avgpoolx(input, strides, dilations, dy, y)
+	@primitive avgpool(input, fmforw, fmback, window, strides, dilations),dy,y avgpoolx(input, fmforw, fmback, window, strides, dilations, y, dy)
+	@zerograd avgpoolx(input, fmforw, fmback, window, strides, dilations, dy, y)
 
 
 
@@ -210,6 +210,8 @@ module Deeplearning
 	""
 	mutable struct Pooling
 	    f
+	    fmforw
+	    fmback
 	end
 
 	"
@@ -228,7 +230,9 @@ module Deeplearning
 
 	        _dimcheck_convolutionkernel(input_size, kernel_size)
 	        fm_size = _featuremapsize(input_size, kernel_size, strides)
-	        poolop = Pooling(x->cat([maxpool(x[:,:,xi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3))
+	        fmforw = @createarray fm_size
+	        fmback = @createarray input_size
+	        poolop = Pooling(x->cat([maxpool(x[:,:,xi], fmforw, fmback, window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3), fmforw, fmback)
 	        poolop
 	    end
 	    @eval function (poolop::Pooling)(x) poolop.f(x) end
@@ -251,7 +255,9 @@ module Deeplearning
 
 	        _dimcheck_convolutionkernel(input_size, kernel_size)
 	        fm_size = _featuremapsize(input_size, kernel_size, strides)
-	        poolop = Pooling(x->cat([avgpool(x[:,:,xi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3))
+	        fmforw = @createarray fm_size
+	        fmback = @createarray input_size
+	        poolop = Pooling(x->cat([avgpool(x[:,:,xi], fmforw, fmback, window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3), fmforw, fmback)
 	        poolop
 	    end
 	    @eval function (poolop::Pooling)(x) poolop.f(x) end
