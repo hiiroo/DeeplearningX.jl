@@ -3,8 +3,9 @@ module Deeplearning
 	!(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
 	using AutoGrad
 	using LinearAlgebra
+	using Statistics
 
-	export @convolve, @dense, @maxpool, @kmaxpool, @cudaarray, @createarray, @parameters, @onehot, @onehotencode, @onehotdecode, sigmoid, relu, softmax, squared_diff
+	export @convolve, @dense, @maxpool, @avgpool, @kmaxpool, @cudaarray, @createarray, @parameters, @onehot, @onehotencode, @onehotdecode, sigmoid, relu, softmax, squared_diff
 
 	macro createarray(sz)
 	    quote
@@ -126,26 +127,81 @@ module Deeplearning
 
 	#Pooling operations
 
-	function pool(op::Function, input, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int})
-	    input_size = size(input)
-	    kernel_size = _kernelsize(strides, dilations)
+	function findmaxidxs(x, xis)
+	    xis[findmax(x)[2]]
+	end
 
-	    _dimcheck_convolutionkernel(input_size, kernel_size)
-	    fm_size = _featuremapsize(input_size, kernel_size, strides)
-	    margin = input_size.%kernel_size
+	function findmeanidxs(x, xis)
+	    xis
+	end
 
-	    ap = zeros(input_size)
-	    for i in (1):strides[2]:(input_size[2]-margin[2])
-	        for j in (1):strides[1]:(input_size[1]-margin[1])
-	            t1 = input[j:dilations[2]:(j+strides[2]-1), i:dilations[1]:(i+strides[1]-1)]
-	            t1max = op(t1)
-	            ap[(Tuple(t1max[2]).+(j,i).-(1, 1))...] = true
+	function poolidxs(op::Function, input, window::Tuple{Int, Int}, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int}, input_size::Tuple{Int, Int}, kernel_size::Tuple{Int, Int}, margin::Tuple{Int, Int})
+	    api = CartesianIndices(input_size)
+	    ap = []
+	    @inbounds for i in 1:strides[2]:(input_size[2]-margin[2])
+	        @inbounds for j in 1:strides[1]:(input_size[1]-margin[1])
+	            @views t1 = input[j:dilations[2]:(j+kernel_size[2]-1), i:dilations[1]:(i+kernel_size[1]-1)]
+	            @views t1idxs = api[j:dilations[2]:(j+kernel_size[2]-1), i:dilations[1]:(i+kernel_size[1]-1)]
+	            @views opidxs = op(t1, t1idxs)
+	            push!(ap, opidxs)
 	        end
 	    end
 
-	    return BitArray(ap)
+	    return ap
 	end
-	@zerograd pool(op::Function, input, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int})
+	@zerograd poolidxs(op::Function, input, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int})
+
+	function maxpool(input, window, strides, dilations)
+	    input_size = size(input)
+	    kernel_size = _kernelsize(window, dilations)
+	    fm_size = _featuremapsize(input_size, kernel_size, strides)
+        margin = input_size.%kernel_size
+
+	    y = reshape(map(opidx->maximum(input[opidx]), poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
+	    return y
+	end
+
+	function maxpoolx(input, window, strides, dilations, dy, y)
+	    input_size = size(input)
+	    kernel_size = _kernelsize(strides, dilations)
+	    fm_size = _featuremapsize(input_size, kernel_size, strides)
+        margin = input_size.%kernel_size
+
+	    opidxs = poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)
+	    dx = zeros(input_size)
+	    map(opidxp->dx[opidxp[1]]=opidxp[2], zip(opidxs,y))
+	    return dx
+	end
+
+	@primitive maxpool(input, window, strides, dilations),dy,y maxpoolx(input, window, strides, dilations, y, dy)
+	@zerograd maxpoolx(input, window, strides, dilations, dy, y)
+
+	function avgpool(input, window, strides, dilations)
+	    input_size = size(input)
+	    kernel_size = _kernelsize(window, dilations)
+	    fm_size = _featuremapsize(input_size, kernel_size, strides)
+        margin = input_size.%kernel_size
+
+	    y = reshape(map(opidx->mean(input[opidx]), poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
+	    return @cudaarray y
+	end
+
+	function avgpoolx(input, window, strides, dilations, dy, y)
+	    input_size = size(input)
+	    kernel_size = _kernelsize(window, dilations)
+	    fm_size = _featuremapsize(input_size, kernel_size, strides)
+        margin = input_size.%kernel_size
+
+	    opidxs = poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)
+	    dx = zeros(input_size)
+	    map(opidxp->dx[opidxp[1]].=opidxp[2]/prod(kernel_size), zip(opidxs,y))
+	    return @cudaarray dx
+	end
+
+	@primitive avgpool(input, strides, dilations),dy,y avgpoolx(input, strides, dilations, y, dy)
+	@zerograd avgpoolx(input, strides, dilations, dy, y)
+
+
 
 	"k-max operation, a is an Array and k is the maximum k element of the column"
 	kmax(a, k::Int) = reshape([ce in sort(a[:,ci])[end-k:end] ? true : false for ci in 1:size(a)[2] for ce in a[:,ci]], size(a))
@@ -160,9 +216,10 @@ module Deeplearning
 	2D max pooling operation. i as input, s as pool dimensions, d as dilations.
 	Example: @maxpool rand(4,4) (2,2) (1,1)
 	"
-	macro maxpool(i, s, d)
+	macro maxpool(i, w, s, d)
 	    poolop=quote
 	        input = $(esc(i))
+	        window = $(esc(w))
 	        strides = $(esc(s))
 	        dilations = $(esc(d))
 
@@ -171,7 +228,30 @@ module Deeplearning
 
 	        _dimcheck_convolutionkernel(input_size, kernel_size)
 	        fm_size = _featuremapsize(input_size, kernel_size, strides)
-	        poolop = Pooling(x->cat([reshape((x[:,:,xi])[LogicalIndices(pool(findmax, x[:,:,xi], strides, dilations))], (fm_size...,1)) for xi in 1:size(x)[3]]...,dims=3))
+	        poolop = Pooling(x->cat([maxpool(x[:,:,xi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3))
+	        poolop
+	    end
+	    @eval function (poolop::Pooling)(x) poolop.f(x) end
+	    poolop
+	end
+
+	"
+	2D avg pooling operation. i as input, s as pool dimensions, d as dilations.
+	Example: @avgpool rand(4,4) (2,2) (1,1)
+	"
+	macro avgpool(i, w, s, d)
+	    poolop=quote
+	        input = $(esc(i))
+	        window = $(esc(w))
+	        strides = $(esc(s))
+	        dilations = $(esc(d))
+
+	        input_size = size(input)[1:end-1]
+	        kernel_size = _kernelsize(strides, dilations)
+
+	        _dimcheck_convolutionkernel(input_size, kernel_size)
+	        fm_size = _featuremapsize(input_size, kernel_size, strides)
+	        poolop = Pooling(x->cat([avgpool(x[:,:,xi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3))
 	        poolop
 	    end
 	    @eval function (poolop::Pooling)(x) poolop.f(x) end
