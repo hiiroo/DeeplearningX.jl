@@ -28,30 +28,22 @@ convolution operation with specified input, kernel, stride
 and dilation configuration.
 "
 mutable struct Convolution
-    "
-    Convolution matrix. @convolve macro creates the
-    convolution matrix with respect to the expected inputsize
-    "
-    matrix
-    "
-    Convolution kernel function. @convolve macro creates
-    a function to retrieve convolution kernels from convolution matrix
-    "
-    kernel
-    f
+	m
+	k
+	f
 end
 
 "
 "
 mutable struct Pooling
-    f
+	f
 end
 
 "
 "
 mutable struct Densemul
-    matrix
-    f
+	m
+	f
 end
 
 "

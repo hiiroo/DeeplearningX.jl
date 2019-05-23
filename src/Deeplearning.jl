@@ -1,4 +1,4 @@
-#=
+k#=
 MIT License
 
 Copyright (c) 2019 Ali Mert Ceylan
@@ -31,21 +31,22 @@ module Deeplearning
 	include("macros.jl")
 	include("act.jl")
 	include("core.jl")
+	include("interface.jl")
 
-	export @convolve,
-			@dense,
-			@maxpool,
-			@avgpool,
-			@kmaxpool,
+	export convolve,
+			dense,
+			maxpooling,
+			avgpooling,
+			kmaxpooling,
+			sigmoid,
+			relu,
+			softmax,
+			squared_diff,
 			@cudaarray,
 			@createarray,
 			@parameters,
 			@onehot,
 			@onehotencode,
-			@onehotdecode,
-			sigmoid,
-			relu,
-			softmax,
-			squared_diff
+			@onehotdecode
 
 end # module
