@@ -22,6 +22,40 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 =#
 
+"
+Convolution operation. Used by @convolve macro to create a
+convolution operation with specified input, kernel, stride
+and dilation configuration.
+"
+mutable struct Convolution
+    "
+    Convolution matrix. @convolve macro creates the
+    convolution matrix with respect to the expected inputsize
+    "
+    matrix
+    "
+    Convolution kernel function. @convolve macro creates
+    a function to retrieve convolution kernels from convolution matrix
+    "
+    kernel
+    f
+end
+
+"
+"
+mutable struct Pooling
+    f
+end
+
+"
+"
+mutable struct Densemul
+    matrix
+    f
+end
+
+"
+"
 function LogicalIndices(boolarr)
     arr_size = size(boolarr)
     c = reshape(collect(1:prod(size(boolarr))), (prod(size(boolarr)),1))
@@ -30,7 +64,6 @@ end
 
 
 _dimcheck_convolutionkernel(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}) = prod(inputsize .> kernelsize) || throw(ArgumentError("Kernel size $kernelsize cannot be larger than Input size $inputsize"))
-
 _kernelsize(kernelsize::Tuple{Int, Int}, dilations::Tuple{Int, Int}) = ((dilations .* kernelsize) .- (dilations.-1))
 _featuremapsize(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}, strides::Tuple{Int, Int}) = div.(inputsize .- kernelsize, strides) .+ 1
 _convolutionkernelmargin(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}) = Int.(ceil.(inputsize .% kernelsize))
@@ -72,19 +105,6 @@ function col2im(conv_matrix, input_size::Tuple{Int, Int}, weight_size::Tuple{Int
     return ck ./(size(conv_matrix)[2])
 end
 
-
-"Convolution operation. Used by @convolve macro to create a
-convolution operation with specified input, kernel, stride
-and dilation configuration"
-mutable struct Convolution
-    "Convolution matrix. @convolve macro creates the
-    convolution matrix with respect to the expected inputsize"
-    matrix
-    "Convolution kernel function. @convolve macro creates
-    a function to retrieve convolution kernels from convolution matrix"
-    kernel
-    f
-end
 
 #Pooling operations
 
@@ -162,18 +182,6 @@ end
 @primitive avgpool(input, strides, dilations),dy,y avgpoolx(input, strides, dilations, y, dy)
 @zerograd avgpoolx(input, strides, dilations, dy, y)
 
-
-
 "k-max operation, a is an Array and k is the maximum k element of the column"
 kmax(a, k::Int) = reshape([ce in sort(a[:,ci])[end-k:end] ? true : false for ci in 1:size(a)[2] for ce in a[:,ci]], size(a))
 @zerograd kmax(a, k::Int)
-
-""
-mutable struct Pooling
-    f
-end
-
-mutable struct Densemul
-    matrix
-    f
-end
