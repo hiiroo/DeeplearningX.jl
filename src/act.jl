@@ -1,3 +1,4 @@
+#=
 MIT License
 
 Copyright (c) 2019 Ali Mert Ceylan
@@ -19,3 +20,23 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+=#
+
+#Activation functions
+"Sigmoid activation function."
+sigmoid(x) = 1 ./(1 .+exp.(-x))
+
+relumap(x) = Int.(map(x->x>0, x))
+@zerograd relumap(x::Any)
+
+"ReLU activation function."
+function relu(x)
+    return x.*relumap(x)
+end
+
+"Softmax activation function."
+softmax(x) = cat([(exp10.(log.(x[:,bi])))./(sum(exp10.(log.(x[:,bi])))) for bi in 1:size(x)[end]]...,dims= 2)
+
+#Loss functions
+"Squared difference."
+squared_diff(x, y) = sum(abs2.(x-y))
