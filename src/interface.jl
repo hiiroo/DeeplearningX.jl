@@ -38,7 +38,7 @@ function convolve(i, k, s, d)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
 
     cop = Convolution(nothing, nothing, nothing)
-    cm = permutedims(cat([cat([im2col(k[:,:,ki,ci], input_size, kernel_size, strides, dilations, fm_size) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4),(2,1,3,4))
+    cm = @cudaarray permutedims(cat([cat([im2col(k[:,:,ki,ci], input_size, kernel_size, strides, dilations, fm_size) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4),(2,1,3,4))
 
     function kern()
       cat([cat([col2im(collect(cop.matrix[:,:,ki,ci])', input_size, size(k)[1:2], strides, dilations) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4)
@@ -56,7 +56,7 @@ function convolve(i, k, s, d)
         return reshape(cat([reshape(reshape(cop.matrix[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
     end
 
-    cop.matrix = cm
+    cop.matrix = Param(cm)
     cop.kernel = kern
     cop.functn = conv
     @eval function (cop::Convolution)(x)  cop.functn(x) end
