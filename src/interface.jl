@@ -41,7 +41,7 @@ function convolve(i, k, s, d)
     cm = permutedims(cat([cat([im2col(k[:,:,ki,ci], input_size, kernel_size, strides, dilations, fm_size) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4),(2,1,3,4))
 
     function kern()
-      cat([cat([col2im(collect(cop.m[:,:,ki,ci])', input_size, size(k)[1:2], strides, dilations) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4)
+      cat([cat([col2im(collect(cop.matrix[:,:,ki,ci])', input_size, size(k)[1:2], strides, dilations) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4)
     end
 
     function conv(x)
@@ -49,17 +49,17 @@ function convolve(i, k, s, d)
         x_channels = x_size[3]
         x_batch = x_size[4]
 
-        cm_size = size(cop.m)
+        cm_size = size(cop.matrix)
         cm_channels = cm_size[4]
 
         reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
-        return reshape(cat([reshape(reshape(cop.m[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
+        return reshape(cat([reshape(reshape(cop.matrix[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
     end
 
-    cop.m = cm
-    cop.k = kern
-    cop.f = conv
-    @eval function (cop::Convolution)(x)  cop.f(x) end
+    cop.matrix = cm
+    cop.kernel = kern
+    cop.functn = conv
+    @eval function (cop::Convolution)(x)  cop.functn(x) end
     cop
 end
 
@@ -81,7 +81,7 @@ function maxpooling(i, w, s, d)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
     poolop = Pooling(x->cat([cat([maxpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4))
 
-    @eval function (poolop::Pooling)(x) poolop.f(x) end
+    @eval function (poolop::Pooling)(x) poolop.functn(x) end
     poolop
 end
 
@@ -103,7 +103,7 @@ function avgpooling(i, w, s, d)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
     poolop = Pooling(x->cat([cat([avgpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4))
 
-    @eval function (poolop::Pooling)(x) poolop.f(x) end
+    @eval function (poolop::Pooling)(x) poolop.functn(x) end
     poolop
 end
 
@@ -114,7 +114,7 @@ function kmaxpooling(i, k)
     kval = k
     poolop = Pooling(x->cat([(reshape((x[:,:,xi])[LogicalIndices(kmax(x[:,:,xi],kval))], (kval+1, size(x)[2]))')' for xi in 1:size(x)]..., dims=3))
 
-    @eval function (poolop::Pooling)(x) poolop.f(x) end
+    @eval function (poolop::Pooling)(x) poolop.functn(x) end
     poolop
 end
 
@@ -124,8 +124,8 @@ function dense(i, n)
     en = n
     w = @cudaarray rand(en, prod(size(ei)[1:end-1]))
     denseop = Densemul(Param(w), nothing)
-    denseop.f = x->denseop.matrix*reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
+    denseop.functn = x->denseop.matrix*reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
 
-    @eval function (denseop::Densemul)(x) denseop.f(x) end
+    @eval function (denseop::Densemul)(x) denseop.functn(x) end
     denseop
 end

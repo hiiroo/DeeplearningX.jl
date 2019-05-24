@@ -22,34 +22,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 =#
 
-module Deeplearning
-	using Pkg; !(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
-	using AutoGrad
-	using LinearAlgebra
-	using Statistics
+#Loss functions
+"
+Squared difference
+"
+squared_diff(x, y) = sum(abs2.(x-y))
 
-	include("macros.jl")
-	include("act.jl")
-	include("loss.jl")
-	include("core.jl")
-	include("interface.jl")
+"
+Negative Log Likelihood loss
 
-	export convolve,
-			dense,
-			maxpooling,
-			avgpooling,
-			kmaxpooling,
-			sigmoid,
-			relu,
-			softmax,
-			squared_diff,
-			nll,
-			acc,
-			@cudaarray,
-			@createarray,
-			@parameters,
-			@onehot,
-			@onehotencode,
-			@onehotdecode
+p_y: 2D matrix of outputs
 
-end # module
+y: Array of correct indices
+"
+function nll(p_y, y; average=true)
+    lp = [p_y[y[p_s],p_s] for p_s in 1:size(p_y)[2]]
+    average ? mean(lp) : sum(lp)
+end
+
+
+"
+Classification accuracy
+
+p_y: 2D matrix of outputs
+
+y: Array of correct indices
+"
+function acc(p_y, y)
+    return count([ci[1]==y[1] for (cii,ci) in enumerate(findmax(p_y,dims=1)[2])])/size(p_y)[2]
+end

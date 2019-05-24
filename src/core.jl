@@ -27,24 +27,15 @@ Convolution operation. Used by @convolve macro to create a
 convolution operation with specified input, kernel, stride
 and dilation configuration.
 "
-mutable struct Convolution
-	m
-	k
-	f
-end
+mutable struct Convolution; matrix; kernel; functn; end
 
 "
 "
-mutable struct Pooling
-	f
-end
+mutable struct Pooling; functn; end
 
 "
 "
-mutable struct Densemul
-	m
-	f
-end
+mutable struct Densemul; matrix; functn; end
 
 "
 "

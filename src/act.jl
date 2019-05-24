@@ -36,7 +36,3 @@ end
 
 "Softmax activation function."
 softmax(x) = cat([(exp10.(log.(x[:,bi])))./(sum(exp10.(log.(x[:,bi])))) for bi in 1:size(x)[end]]...,dims= 2)
-
-#Loss functions
-"Squared difference."
-squared_diff(x, y) = sum(abs2.(x-y))
