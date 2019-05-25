@@ -37,14 +37,13 @@ function convolve(i, k, s, d)
     _dimcheck_convolutionkernel(input_size, kernel_size)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
 
-    cop = Convolution(nothing, nothing, nothing)
     cm = @cudaarray permutedims(cat([cat([im2col(k[:,:,ki,ci], input_size, kernel_size, strides, dilations, fm_size) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4),(2,1,3,4))
 
-    function kern()
+    function kern(cop::Convolution)
       cat([cat([col2im(collect(cop.matrix[:,:,ki,ci])', input_size, size(k)[1:2], strides, dilations) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4)
     end
 
-    function conv(x)
+    function conv(cop::Convolution, x)
         x_size = size(x)
         x_channels = x_size[3]
         x_batch = x_size[4]
@@ -56,10 +55,11 @@ function convolve(i, k, s, d)
         return reshape(cat([reshape(reshape(cop.matrix[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
     end
 
-    cop.matrix = Param(cm)
-    cop.kernel = kern
-    cop.functn = conv
-    @eval function (cop::Convolution)(x)  cop.functn(x) end
+    matrix = Param(cm)
+    kernel = kern
+    functn = conv
+    cop = Convolution(matrix, kernel, functn)
+    # @eval function (cop::Convolution)(x)  cop.functn(x) end
     cop
 end
 
@@ -79,9 +79,9 @@ function maxpooling(i, w, s, d)
 
     _dimcheck_convolutionkernel(input_size, kernel_size)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
-    poolop = Pooling(x->cat([cat([maxpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4))
+    poolop = Pool(x->cat([cat([maxpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4))
 
-    @eval function (poolop::Pooling)(x) poolop.functn(x) end
+    # @eval function (poolop::Pooling)(x) poolop.functn(x) end
     poolop
 end
 
@@ -101,9 +101,9 @@ function avgpooling(i, w, s, d)
 
     _dimcheck_convolutionkernel(input_size, kernel_size)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
-    poolop = Pooling(x->cat([cat([avgpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4))
+    poolop = Pool(x->cat([cat([avgpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4))
 
-    @eval function (poolop::Pooling)(x) poolop.functn(x) end
+    # @eval function (poolop::Pooling)(x) poolop.functn(x) end
     poolop
 end
 
@@ -112,9 +112,9 @@ function kmaxpooling(i, k)
 
     input = i
     kval = k
-    poolop = Pooling(x->cat([(reshape((x[:,:,xi])[LogicalIndices(kmax(x[:,:,xi],kval))], (kval+1, size(x)[2]))')' for xi in 1:size(x)]..., dims=3))
+    poolop = Pool(x->cat([(reshape((x[:,:,xi])[LogicalIndices(kmax(x[:,:,xi],kval))], (kval+1, size(x)[2]))')' for xi in 1:size(x)]..., dims=3))
 
-    @eval function (poolop::Pooling)(x) poolop.functn(x) end
+    # @eval function (poolop::Pooling)(x) poolop.functn(x) end
     poolop
 end
 

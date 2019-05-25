@@ -28,10 +28,14 @@ convolution operation with specified input, kernel, stride
 and dilation configuration.
 "
 mutable struct Convolution; matrix; kernel; functn; end
+(c::Convolution)(x) = c.functn(c, x)
+Convolve(m,k,f) = Convolution(m,k,f)
 
 "
 "
 mutable struct Pooling; functn; end
+(p::Pooling)(x) = p.functn(x)
+Pool(f) = Pooling(f)
 
 "
 "
