@@ -43,7 +43,8 @@ p_y: 2D matrix of outputs
 y: Array of correct indices
 "
 function nll(p_y, y; average=true)
-    lp = p_y[nll_indices(p_y, y)]
+    # lp = p_y[nll_indices(p_y, y)]
+    lp = [p_y[y[p_s],p_s] for p_s in 1:size(p_y)[2]]
     average ? mean(lp) : sum(lp)
 end
 
