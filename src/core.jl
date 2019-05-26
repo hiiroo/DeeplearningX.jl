@@ -40,6 +40,8 @@ Pool(f) = Pooling(f)
 "
 "
 mutable struct Densemul; matrix; functn; end
+(d::Densemul)(x) = d.functn(d, x)
+Dense(m, f) = Densemul(m, f)
 
 "
 "

@@ -55,12 +55,8 @@ function convolve(i, k, s, d)
         return reshape(cat([reshape(reshape(cop.matrix[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
     end
 
-    matrix = Param(cm)
-    kernel = kern
-    functn = conv
-    cop = Convolution(matrix, kernel, functn)
-    # @eval function (cop::Convolution)(x)  cop.functn(x) end
-    cop
+    cop = Convolution(Param(cm), kern, conv)
+    return cop
 end
 
 
@@ -81,8 +77,7 @@ function maxpooling(i, w, s, d)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
     poolop = Pool(x->cat([cat([maxpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4))
 
-    # @eval function (poolop::Pooling)(x) poolop.functn(x) end
-    poolop
+    return poolop
 end
 
 "
@@ -103,8 +98,7 @@ function avgpooling(i, w, s, d)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
     poolop = Pool(x->cat([cat([avgpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4))
 
-    # @eval function (poolop::Pooling)(x) poolop.functn(x) end
-    poolop
+    return poolop
 end
 
 "k-max pooling operation, creates another array with the size of k, n when given m, n array"
@@ -114,8 +108,7 @@ function kmaxpooling(i, k)
     kval = k
     poolop = Pool(x->cat([(reshape((x[:,:,xi])[LogicalIndices(kmax(x[:,:,xi],kval))], (kval+1, size(x)[2]))')' for xi in 1:size(x)]..., dims=3))
 
-    # @eval function (poolop::Pooling)(x) poolop.functn(x) end
-    poolop
+    return poolop
 end
 
 function dense(i, n)
@@ -123,9 +116,12 @@ function dense(i, n)
     ei = i
     en = n
     w = @cudaarray rand(en, prod(size(ei)[1:end-1]))
-    denseop = Densemul(Param(w), nothing)
-    denseop.functn = x->denseop.matrix*reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
 
-    @eval function (denseop::Densemul)(x) denseop.functn(x) end
-    denseop
+    function mult(d::Densemul, x)
+        return d.matrix*reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
+    end
+
+    denseop = Dense(Param(w), mult)
+
+    return denseop
 end
