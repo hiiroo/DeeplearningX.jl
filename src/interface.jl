@@ -106,7 +106,7 @@ function kmaxpooling(i, k)
 
     input = i
     kval = k
-    poolop = Pool(x->cat([(reshape((x[:,:,xi])[LogicalIndices(kmax(x[:,:,xi],kval))], (kval+1, size(x)[2]))')' for xi in 1:size(x)]..., dims=3))
+    poolop = Pool(x->i[kmax(i,k)])
 
     return poolop
 end

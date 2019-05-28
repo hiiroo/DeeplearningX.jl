@@ -31,6 +31,7 @@ module Deeplearning
 	include("macros.jl")
 	include("act.jl")
 	include("loss.jl")
+	include("kernel.jl")
 	include("core.jl")
 	include("interface.jl")
 
