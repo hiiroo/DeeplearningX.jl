@@ -132,8 +132,10 @@ struct PoolLayer
 
         if(m==0)
           pfunc(x) = cat([cat([maxpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4)
-        else
+        else if(m==1)
           pfunc(x) = cat([cat([avgpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4)
+        else
+          pfunc(x,k) = x[kmax(x,k)]
         end
 
         return new(LayerTelemetry(nothing, nothing, os), pfunc)
@@ -188,93 +190,6 @@ mutable struct Network; layers; functn; lossfn; end
 # (n::Network)(d::Knet.Data) = mean(n(x, y) for (x,y) in d)
 Network(l,f;loss=nll) = Network(l,f,loss)
 
-#=
-function kmaxvaluesv3(a, k)
-  a_size = size(a)
-  vas = []
-  for i in 1:a_size[1]:prod(a_size)
-     va = zeros(Int64, k)
-     for avi in i:i+a_size[1]-1
-         for vai in 1:k
-             if va[vai] == 0 || a[avi] >= a[va[vai]]
-                 if va[vai] != 0
-                     insert!(va, vai, avi)
-                     va = va[1:end-1]
-                 else
-                     va[vai] = avi
-                 end
-                 break
-             end
-         end
-     end
-     push!(vas, va)
-  end
-  return reshape(hcat(vas...), (k, a_size[2:end]...))
-end
-=#
-#=
-"k-max operation, a is an Array and k is the maximum k element of the column"
-function kmax(a, k::Int)
-	pmap = falses(size(a))
-	a_size = size(a)
-  r = (kmaxvaluesv3(a, k) .% a_size[1])
-  r[r.==0].=a_size[1]
-  ind = r
-
-
-	@inbounds for b in 1:a_size[end]
-	    @inbounds for c in 1:a_size[end-1]
-	        @inbounds for n in 1:a_size[end-2]
-	            pmap[ind[:,n,c,b],n,c,b].=true
-	        end
-	    end
-	end
-
-    return pmap
-end
-@zerograd kmax(x, k::Int)
-=#
-#=
-"
-kMaxPool(k); k-max pooling operation. Operation pool over rows, assuming word vectors are columns.
-
-k: Maximum k values to be picked.
-
-Example 1:
-
-kmaxlayer = kMaxPool(3)((24, 7, 6, 100))
-
-Expected output: kmaxlayer.t.o=(24,3,6,100)
-
-Example 2:
-
-kmaxlayer = kMaxPool(nothing)((24, 7, 6, 100))
-
-Expected output: kmaxlayer.t.o=(24,nothing,6,100)
-
-i = rand(24,7,6,100)
-kmaxlayer(i, k=4)
-
-Expected output: Array{Float32, 4} with size (24, 4, 6, 100)
-
-
-"
-function kMaxPool(k)
-    function p(i)
-        input_size = i[1:2]
-        function pf(x; k = k)
-        	x_size = size(x)
-        	x = permutedims(x, (2,1,3,4))
-        	@views x = reshape(x[kmax(x, k)], (k, x_size[1], x_size[3:end]...))
-        	x = permutedims(x, (2,1,3,4))
-            return x
-        end
-        fm_size = (input_size[1], k)
-        os = (fm_size..., i[3:end]...)
-        return Pooling(LayerTelemetry(nothing, nothing, os), pf)
-    end
-end
-=#
 #=
 function Dropout(p)
 	function d(i)
