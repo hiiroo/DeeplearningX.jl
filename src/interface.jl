@@ -22,106 +22,316 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 =#
 
-#Core Interface
+function ongpu(d)
+  (haskey(Pkg.installed(), "CuArrays")) ? CuArray{Float32}(d) : d
+end
 
-"Convolve macro creates convolution matrix wrt expected input and specified
-stride and dilation configuration. Return a convolution struct with necessary
-specifications."
-function convolve(i, k, s, d)
-    strides = length(s) < 2 ? (s, s) : s
-    dilations = length(d) < 2 ? (d, d) : d
+"
+LayerTelemetry type. Store weight, bias, layer output shapes correspondingly w,b,o.
+"
+struct LayerTelemetry; w; b; o; end
 
-    input_size = size(i)[1:2]
-    kernel_size = _kernelsize(size(k)[1:2], dilations)
+function convolution_matrix(k, input_size, ckernel_size, cfm_size, cstride, cdilation)
+  permutedims(cat([cat([im2col(k[:,:,ki,ci], input_size, ckernel_size, cstride, cdilation, cfm_size) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4),(2,1,3,4))
+end
 
-    _dimcheck_convolutionkernel(input_size, kernel_size)
-    fm_size = _featuremapsize(input_size, kernel_size, strides)
+"
+t->Telemetry
 
-    cm = @cudaarray permutedims(cat([cat([im2col(k[:,:,ki,ci], input_size, kernel_size, strides, dilations, fm_size) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4),(2,1,3,4))
 
-    function kern(cop::Convolution)
-      cat([cat([col2im(collect(cop.matrix[:,:,ki,ci])', input_size, size(k)[1:2], strides, dilations) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4)
+"
+struct ConvolutionLayer
+  telemetry
+  matrix
+  bias
+  activation
+  functn
+  kernel
+
+  function ConvolutionLayer(k, s, d, init, act; w=nothing, b=nothing)
+
+    function c(i)
+
+        input_size = i[1:end-2]
+        kernel_size = _kernelsize(k[1:end-1], d)
+        fm_size = _featuremapsize(input_size, kernel_size, s)
+        ws = (k[1:2]...,i[3],k[3])
+        bs = (1,1,k[3],1)
+        os = (fm_size...,k[end], i[end])
+
+        function kern(cop::ConvolutionLayer)
+          cat([cat([col2im(collect(cop.matrix[:,:,ki,ci])', input_size, cop.telemetry.w[1:2], s, d) for ki in 1:cop.telemetry.w[3]]...,dims=3) for ci in 1:cop.telemetry.w[4]]...,dims=4)
+        end
+
+        function conv(cop::ConvolutionLayer, x)
+          x_size = size(x)
+          x_channels = x_size[3]
+          x_batch = x_size[4]
+
+          cm_size = size(cop.matrix)
+          cm_channels = cm_size[4]
+
+          reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
+          return reshape(cat([reshape(reshape(cop.matrix[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
+        end
+
+        (cl::ConvolutionLayer) =  new(LayerTelemetry(ws, bs, os),
+                w == nothing ? Param(ongpu(convolution_matrix(init(ws), input_size, kernel_size, fm_size, s, d))) : Param(ongpu(convolution_matrix(w, input_size, kernel_size, fm_size, s, d))),
+                b == nothing ? Param(ongpu(init(bs...))) : Param(ongpu(b)),
+                act,
+                conv,
+                ()->kern(cl))
+
+        return cl
     end
+  end
+end
+(c::ConvolutionLayer)(x) = c.activation.(c.functn(c, x) .+ c.bias)
 
-    function conv(cop::Convolution, x)
-        x_size = size(x)
-        x_channels = x_size[3]
-        x_batch = x_size[4]
 
-        cm_size = size(cop.matrix)
-        cm_channels = cm_size[4]
+mat(x) = reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
 
-        reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
-        return reshape(cat([reshape(reshape(cop.matrix[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
+"
+t->Telemetry
+
+"
+struct FullyConnectedLayer
+  telemetry
+  matrix
+  bias
+  activation
+
+  function FullyConnectedLayer(n, init, act; w=nothing, b=nothing)
+
+    function d(i)
+        weight_size = (n, prod(i[1:end-1]))
+        fm_size = (n, 1, i[end])
+        return new(LayerTelemetry(weight_size, fm_size,  fm_size),
+            w == nothing ? Param(ongpu(init(weight_size...))) : Param(ongpu(w)),
+            b == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
+            act)
     end
-
-    cop = Convolution(Param(cm), kern, conv)
-    return cop
+  end
 end
-
+(d::FullyConnectedLayer)(x) = d.activation.((d.matrix*mat(x)).+d.bias)
 
 "
-2D max pooling operation. i as input, s as pool dimensions, d as dilations.
-Example: @maxpool rand(4,4) (2,2) (1,1)
-"
-function maxpooling(i, w, s, d)
-    input = i
-    window = w
-    strides = s
-    dilations = d
-
-    input_size = size(input)[1:2]
-    kernel_size = _kernelsize(strides, dilations)
-
-    _dimcheck_convolutionkernel(input_size, kernel_size)
-    fm_size = _featuremapsize(input_size, kernel_size, strides)
-    poolop = Pool(x->cat([cat([maxpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4))
-
-    return poolop
-end
+t->Telemetry
 
 "
-2D avg pooling operation. i as input, s as pool dimensions, d as dilations.
-Example: @avgpool rand(4,4) (2,2) (1,1)
-"
-function avgpooling(i, w, s, d)
+struct PoolLayer
+  t
+  f
 
-    input = i
-    window = w
-    strides = s
-    dilations = d
+  function PoolLayer(w,s,d,m)
+    function p(i)
+        input_size = i[1:end-2]
+        kernel_size = _kernelsize(w, d)
+        fm_size = _featuremapsize(input_size, kernel_size, s)
+        os = (fm_size..., i[end-1:end]...)
 
-    input_size = size(input)[1:2]
-    kernel_size = _kernelsize(strides, dilations)
+        if(m==0)
+          pfunc(x) = cat([cat([maxpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4)
+        else
+          pfunc(x) = cat([cat([avgpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4)
+        end
 
-    _dimcheck_convolutionkernel(input_size, kernel_size)
-    fm_size = _featuremapsize(input_size, kernel_size, strides)
-    poolop = Pool(x->cat([cat([avgpool(x[:,:,xi,bi], window, strides, dilations) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4))
-
-    return poolop
-end
-
-"k-max pooling operation, creates another array with the size of k, n when given m, n array"
-function kmaxpooling(i, k)
-
-    input = i
-    kval = k
-    poolop = Pool(x->i[kmax(i,k)])
-
-    return poolop
-end
-
-function dense(i, n)
-
-    ei = i
-    en = n
-    w = @cudaarray rand(en, prod(size(ei)[1:end-1]))
-
-    function mult(d::Densemul, x)
-        return d.matrix*reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
+        return new(LayerTelemetry(nothing, nothing, os), pfunc)
     end
-
-    denseop = Dense(Param(w), mult)
-
-    return denseop
+  end
 end
+(p::PoolLayer)(x;args...) = p.f(x;args...)
+Pooling(t, f) = PoolLayer(t, f)
+
+#=
+"
+t->Telemetry
+
+"
+struct DropoutLayer; t; f; end
+(d::DropoutLayer)(x) = d.f(x)
+Dropping(t, f) = DropoutLayer(t, f)
+=#
+#=
+"
+t->Telemetry
+
+d->Dict; for word and word vectors
+
+f->Function; embedding function
+"
+struct EmbeddingLayer; t; d; f; end
+(e::EmbeddingLayer)(x) = e.f(x)
+Embedding(t, d, f) = EmbeddingLayer(t, d, f)
+=#
+#=
+"
+t->Telemetry
+
+fd->(f)old (d)imension i.e. 2
+"
+struct FoldingLayer; t; d; f; end
+(f::FoldingLayer)(x) = f.f(x)
+Folding(t, d, f) = FoldingLayer(t, d, f)
+=#
+
+"
+layers->Array of layers
+
+functn->Network as a function
+
+lossfn->Loss function
+"
+mutable struct Network; layers; functn; lossfn; end
+(n::Network)(x::Array) = n.functn(x)
+(n::Network)(x::Array,y::Array;kwargs...) = n.lossfn(n(x),y;kwargs...)
+# (n::Network)(d::Knet.Data) = mean(n(x, y) for (x,y) in d)
+Network(l,f;loss=nll) = Network(l,f,loss)
+
+#=
+function kmaxvaluesv3(a, k)
+  a_size = size(a)
+  vas = []
+  for i in 1:a_size[1]:prod(a_size)
+     va = zeros(Int64, k)
+     for avi in i:i+a_size[1]-1
+         for vai in 1:k
+             if va[vai] == 0 || a[avi] >= a[va[vai]]
+                 if va[vai] != 0
+                     insert!(va, vai, avi)
+                     va = va[1:end-1]
+                 else
+                     va[vai] = avi
+                 end
+                 break
+             end
+         end
+     end
+     push!(vas, va)
+  end
+  return reshape(hcat(vas...), (k, a_size[2:end]...))
+end
+=#
+#=
+"k-max operation, a is an Array and k is the maximum k element of the column"
+function kmax(a, k::Int)
+	pmap = falses(size(a))
+	a_size = size(a)
+  r = (kmaxvaluesv3(a, k) .% a_size[1])
+  r[r.==0].=a_size[1]
+  ind = r
+
+
+	@inbounds for b in 1:a_size[end]
+	    @inbounds for c in 1:a_size[end-1]
+	        @inbounds for n in 1:a_size[end-2]
+	            pmap[ind[:,n,c,b],n,c,b].=true
+	        end
+	    end
+	end
+
+    return pmap
+end
+@zerograd kmax(x, k::Int)
+=#
+#=
+"
+kMaxPool(k); k-max pooling operation. Operation pool over rows, assuming word vectors are columns.
+
+k: Maximum k values to be picked.
+
+Example 1:
+
+kmaxlayer = kMaxPool(3)((24, 7, 6, 100))
+
+Expected output: kmaxlayer.t.o=(24,3,6,100)
+
+Example 2:
+
+kmaxlayer = kMaxPool(nothing)((24, 7, 6, 100))
+
+Expected output: kmaxlayer.t.o=(24,nothing,6,100)
+
+i = rand(24,7,6,100)
+kmaxlayer(i, k=4)
+
+Expected output: Array{Float32, 4} with size (24, 4, 6, 100)
+
+
+"
+function kMaxPool(k)
+    function p(i)
+        input_size = i[1:2]
+        function pf(x; k = k)
+        	x_size = size(x)
+        	x = permutedims(x, (2,1,3,4))
+        	@views x = reshape(x[kmax(x, k)], (k, x_size[1], x_size[3:end]...))
+        	x = permutedims(x, (2,1,3,4))
+            return x
+        end
+        fm_size = (input_size[1], k)
+        os = (fm_size..., i[3:end]...)
+        return Pooling(LayerTelemetry(nothing, nothing, os), pf)
+    end
+end
+=#
+#=
+function Dropout(p)
+	function d(i)
+		return Dropping(LayerTelemetry(nothing, nothing, i), x->dropout(x, p))
+	end
+end
+=#
+#=
+"
+Fold(d)
+
+d: Fold coefficient
+
+Usage:
+
+julia> f1layer = Fold(2)((48, 7, 1, 1))
+
+Expected output: f1layer.t.o=(24, 7, 1, 1)
+"
+function Fold(d)
+
+    function f(i)
+        input_size = i[1:2]
+        fm_size = (input_size[1] != nothing ? Int(ceil(input_size[1]/d)) : nothing, input_size[2])
+        os = (fm_size..., i[3:end]...)
+        return Folding(LayerTelemetry(nothing, nothing, os), d, x->pool(x, window=(d,1), stride=(d,1), padding=(0,0), mode=1).*d)
+    end
+end
+=#
+#=
+"
+Embed(s,d); Embedding layer.
+
+s: Vector size i.e. 16 if word vectors have shape of (16,1)
+
+d: Dict; dictionary aka lookup table for words to corresponding vectors
+
+Usage:
+
+If sentences have the same length they can be given as minibatches to layer.
+
+e1layer = Embed(16, lookup_table)(11, 100)
+
+Expected output: e1layer.t.o=(16,11,1,100)
+
+In an online learning setup, using minibatches won't be possible since sentence lengths will not be same, for that case;
+
+e1layer = Embed(16, lookup_table)()
+
+Expected output: e1layer.t.o=(16,nothing,1,1)
+"
+function Embed(s, d;args...)
+    function e(i=nothing, b=nothing)
+    	function ef(xs)
+    		return reshape(hcat([hcat([get(e.d, xi, tryparse(Float32, xi) != nothing ? e.d["<num>"] : e.d["<unk>"])  for xi in x]...) for x in xs]...), (s, length(xs[1]), 1, length(xs)))
+    	end
+        Embedding(LayerTelemetry(nothing, nothing, (s, i, 1, b !=nothing ? b : 1)), d, ef)
+    end
+end
+=#

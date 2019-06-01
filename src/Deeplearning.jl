@@ -38,22 +38,22 @@ module Deeplearning
 	include("core.jl")
 	include("interface.jl")
 
-	export convolve,
-			dense,
-			maxpooling,
-			avgpooling,
-			kmaxpooling,
+	export 	@cudaarray,
+			@createarray,
+			@parameters,
+			@onehot,
+			@onehotencode,
+			@onehotdecode,
 			sigmoid,
 			relu,
 			softmax,
 			squared_diff,
 			nll,
 			acc,
-			@cudaarray,
-			@createarray,
-			@parameters,
-			@onehot,
-			@onehotencode,
-			@onehotdecode
+			LayerTelemetry,
+			ConvolutionLayer
+			FullyConnectedLayer,
+			PoolLayer,
+			Network
 
 end # module
