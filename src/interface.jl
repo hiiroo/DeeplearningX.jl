@@ -23,7 +23,7 @@ SOFTWARE.
 =#
 
 function ongpu(d)
-  (haskey(Pkg.installed(), "CuArrays")) ? CuArray{Float32}(d) : d
+  !(haskey(Pkg.installed(), "CuArrays")) ? cu(d) : d
 end
 
 "
@@ -132,7 +132,7 @@ struct PoolLayer
 
         if(m==0)
           pfunc(x) = cat([cat([maxpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4)
-        else if(m==1)
+        elseif(m==1)
           pfunc(x) = cat([cat([avgpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4)
         else
           pfunc(x,k) = x[kmax(x,k)]

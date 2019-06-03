@@ -24,9 +24,28 @@ SOFTWARE.
 
 #Array Utilities
 
+"
+Function creator macro to enforce float32 type on random or other weight initialization functions that support rand(Float32, m, n, ...) format
+
+Usage:
+
+julia> xavierfloat32 = @float32 xavier
+
+julia> xavierfloat32(4,5)
+
+0.127307  -0.0146135  -0.278793  -0.11998    -0.446539
+0.292935   0.0432366   0.305089  -0.0674677   0.299479
+0.388128   0.244012    0.303878  -0.421147    0.0951707
+0.139119  -0.402997    0.165534  -0.270187   -0.217053
+"
+macro float32(f)
+    g(x...) = eval(Expr(:call, f, Float32, x...))
+    g
+end
+
 macro createarray(sz)
     quote
-        a = rand(Float64, $(esc(sz)))
+        a = rand(Float32, $(esc(sz)))
         (haskey(Pkg.installed(), "CuArrays")) ? cu(a) : a
     end
 end

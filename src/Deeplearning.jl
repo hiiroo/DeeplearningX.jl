@@ -27,9 +27,12 @@ module Deeplearning
 	using AutoGrad
 	using LinearAlgebra
 	using Statistics
-	!(haskey(Pkg.installed(), "CUDAdrv")) || using CUDAdrv
-	!(haskey(Pkg.installed(), "CUDAnative")) || using CUDAnative
-	!(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
+	using CUDAdrv
+	using CUDAnative
+	using CuArrays
+	# !(haskey(Pkg.installed(), "CUDAdrv")) || using CUDAdrv
+	# !(haskey(Pkg.installed(), "CUDAnative")) || using CUDAnative
+	# !(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
 
 	include("macros.jl")
 	include("act.jl")
@@ -38,7 +41,8 @@ module Deeplearning
 	include("core.jl")
 	include("interface.jl")
 
-	export 	@cudaarray,
+	export 	@float32,
+			@cudaarray,
 			@createarray,
 			@parameters,
 			@onehot,
