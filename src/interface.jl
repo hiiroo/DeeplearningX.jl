@@ -26,15 +26,13 @@ function ongpu(d)
   (haskey(Pkg.installed(), "CuArrays")) ? CuArray{Float32}(d) : d
 end
 
+
 "
 LayerTelemetry type. Store weight, bias, layer output shapes correspondingly w,b,o.
 "
 struct LayerTelemetry; w; b; o; end
 
-function convolution_matrix(k, input_size, ckernel_size, cfm_size, cstride, cdilation)
-  permutedims(cat([cat([im2col(k[:,:,ki,ci], input_size, ckernel_size, cstride, cdilation, cfm_size) for ki in 1:size(k)[3]]...,dims=3) for ci in 1:size(k)[4]]...,dims=4),(2,1,3,4))
-end
-
+  
 "
 t->Telemetry
 
@@ -42,11 +40,9 @@ t->Telemetry
 "
 struct ConvolutionLayer
   telemetry
-  matrix
+  weight
   bias
   activation
-  functn
-  kernel
 
   function ConvolutionLayer(k, s, d, init, act; w=nothing, b=nothing)
 
@@ -55,41 +51,21 @@ struct ConvolutionLayer
         input_size = i[1:end-2]
         kernel_size = _kernelsize(k[1:end-1], d)
         fm_size = _featuremapsize(input_size, kernel_size, s)
-        ws = (k[1:2]...,i[3],k[3])
+        ws = (kernel_size...,i[3],k[3])
         bs = (1,1,k[3],1)
-        os = (fm_size...,k[end], i[end])
-
-        function kern(cop::ConvolutionLayer)
-          cat([cat([col2im(collect(cop.matrix[:,:,ki,ci])', input_size, cop.telemetry.w[1:2], s, d) for ki in 1:cop.telemetry.w[3]]...,dims=3) for ci in 1:cop.telemetry.w[4]]...,dims=4)
-        end
-
-        function conv(cop::ConvolutionLayer, x)
-          x_size = size(x)
-          x_channels = x_size[3]
-          x_batch = x_size[4]
-
-          cm_size = size(cop.matrix)
-          cm_channels = cm_size[4]
-
-          reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
-          return reshape(cat([reshape(reshape(cop.matrix[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
-        end
+        os = (fm_size...,k[end],i[end])
 
         (cl::ConvolutionLayer) =  new(LayerTelemetry(ws, bs, os),
-                w == nothing ? Param(ongpu(convolution_matrix(init(ws), input_size, kernel_size, fm_size, s, d))) : Param(ongpu(convolution_matrix(w, input_size, kernel_size, fm_size, s, d))),
+                w == nothing ? Param(ongpu(init(ws...))) : Param(ongpu(w)),
                 b == nothing ? Param(ongpu(init(bs...))) : Param(ongpu(b)),
-                act,
-                conv,
-                ()->kern(cl))
+                act)
 
         return cl
     end
   end
 end
-(c::ConvolutionLayer)(x) = c.activation.(c.functn(c, x) .+ c.bias)
+(c::ConvolutionLayer)(x;args...) = c.activation.(conv(c.weight, x;args...) .+ c.bias)
 
-
-mat(x) = reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
 
 "
 t->Telemetry
@@ -97,7 +73,7 @@ t->Telemetry
 "
 struct FullyConnectedLayer
   telemetry
-  matrix
+  weight
   bias
   activation
 
@@ -113,7 +89,7 @@ struct FullyConnectedLayer
     end
   end
 end
-(d::FullyConnectedLayer)(x) = d.activation.((d.matrix*mat(x)).+d.bias)
+(d::FullyConnectedLayer)(x) = d.activation.((d.weight*mat(x)).+d.bias)
 
 "
 t->Telemetry
@@ -185,7 +161,7 @@ lossfn->Loss function
 mutable struct Network; layers; functn; lossfn; end
 (n::Network)(x::Array) = n.functn(x)
 (n::Network)(x::Array,y::Array;kwargs...) = n.lossfn(n(x),y;kwargs...)
-# (n::Network)(d::Knet.Data) = mean(n(x, y) for (x,y) in d)
+(n::Network)(d::Data) = mean(n(x, y) for (x,y) in d)
 Network(l,f;loss=nll) = Network(l,f,loss)
 
 #=

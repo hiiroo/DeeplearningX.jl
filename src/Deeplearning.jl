@@ -29,6 +29,9 @@ module Deeplearning
 	using Statistics
 
 	include("macros.jl")
+	include("dist.jl")
+	include("data.jl")
+	include("progress.jl")
 	include("act.jl")
 	include("loss.jl")
 	include("core.jl")
@@ -40,6 +43,10 @@ module Deeplearning
 			@onehot,
 			@onehotencode,
 			@onehotdecode,
+			mat,
+			gaussian,
+			xavier,
+			bilinear,
 			sigmoid,
 			relu,
 			softmax,
@@ -50,6 +57,12 @@ module Deeplearning
 			ConvolutionLayer
 			FullyConnectedLayer,
 			PoolLayer,
-			Network
+			Network,
+			Data,
+			minibatch,
+			repeat,
+			progress
+
+	mat(x) = reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
 
 end # module

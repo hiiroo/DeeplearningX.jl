@@ -35,7 +35,7 @@ p_y: 2D matrix of outputs
 
 y: Array of correct indices
 "
-function nll(p_y, y; average=true)
+function nll(p_y, y;average=true)
     lp = [p_y[y[p_s],p_s] for p_s in 1:size(p_y)[2]]
     average ? mean(lp) : sum(lp)
 end
@@ -47,7 +47,10 @@ Classification accuracy
 p_y: 2D matrix of outputs
 
 y: Array of correct indices
+
+average: Returns count of correct classifications, average otherwise
 "
-function acc(p_y, y)
-    return count([ci[1]==y[1] for (cii,ci) in enumerate(findmax(p_y,dims=1)[2])])/size(p_y)[2]
+function acc(p_y, y;average=true)
+    cnt = count([ci[1]==y[1] for (cii,ci) in enumerate(findmax(p_y,dims=1)[2])])
+    return average ? cnt/size(p_y)[2] : cnt
 end
