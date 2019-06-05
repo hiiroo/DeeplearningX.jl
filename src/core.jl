@@ -89,13 +89,13 @@ function conv(w, x;s=(1,1),d=(1,1))
     fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]    
+    cm_channels = cm_size[4]
     conv_mat=zeros(cm_size...)
-    
+
     reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
-    
+
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
-    
+
     return reshape(cat([reshape(reshape(conv_mat[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
 end
 
@@ -109,14 +109,14 @@ function convx(w, x, dy;s=(1,1),d=(1,1))
     fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]    
+    cm_channels = cm_size[4]
     conv_mat=zeros(cm_size...)
-    
+
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
     conv_mat = permutedims(conv_mat, (2,1,3,4))
     conv_mat = permutedims(conv_mat, (1,2,4,3))
     cm_size = size(conv_mat)
-    cm_channels = cm_size[4]    
+    cm_channels = cm_size[4]
 
     dy_size = size(dy)
     dy_batch=dy_size[4]
@@ -135,20 +135,20 @@ function convw(w, x, dy;s=(1,1),d=(1,1))
     fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]    
+    cm_channels = cm_size[4]
     conv_mat=zeros(cm_size...)
-    
+
     dy = permutedims(dy, (1,2,4,3))
     dy_size = size(dy)
     dy_batch=dy_size[3]
     dy_channels=dy_size[4]
     reshaped_dy = reshape(dy, (prod(size(dy)[1:2]), dy_batch, dy_channels))
-    
+
     reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))'
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
 
     dw = cat([reshape(reshape(reshaped_dy[:,:,dmi], (prod(dy_size[1:2]), dy_batch))*reshaped_x, (prod(dy_size[1:2]), prod(x_size[1:2]), x_channels, 1)) for dmi in 1:dy_channels]...,dims=4)
-    
+
     return col2im(dw, w, x_size[1:2], size(w)[1:2], s, d, fm_size)
 end
 

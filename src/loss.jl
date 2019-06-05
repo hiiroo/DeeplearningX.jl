@@ -56,6 +56,7 @@ p_y: 2D matrix of outputs
 
 y: Array of correct indices
 "
-function acc(p_y, y)
-    return count([ci[1]==y[1] for (cii,ci) in enumerate(findmax(p_y,dims=1)[2])])/size(p_y)[2]
+function acc(p_y, y;average=true)
+	ac = count([ci[1]==y[1] for (cii,ci) in enumerate(findmax(p_y,dims=1)[2])])
+    return average ? ac/size(p_y)[2] : ac
 end

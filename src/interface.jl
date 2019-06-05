@@ -32,7 +32,7 @@ LayerTelemetry type. Store weight, bias, layer output shapes correspondingly w,b
 "
 struct LayerTelemetry; w; b; o; end
 
-  
+
 "
 t->Telemetry
 
