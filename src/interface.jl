@@ -64,7 +64,7 @@ struct ConvolutionLayer
     end
   end
 end
-(c::ConvolutionLayer)(x;args...) = c.activation.(conv(c.weight, x;args...) .+ c.bias)
+(c::ConvolutionLayer)(x;args...) = c.activation(conv(c.weight, x;args...) .+ c.bias)
 
 
 "
@@ -89,7 +89,7 @@ struct FullyConnectedLayer
     end
   end
 end
-(d::FullyConnectedLayer)(x) = d.activation.((d.weight*mat(x)).+d.bias)
+(d::FullyConnectedLayer)(x) = d.activation((d.weight*mat(x)).+d.bias)
 
 "
 t->Telemetry

@@ -89,13 +89,13 @@ function conv(w, x;s=(1,1),d=(1,1))
     fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]
+    cm_channels = cm_size[4]    
     conv_mat=zeros(cm_size...)
-
+    
     reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
-
+    
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
-
+    
     return reshape(cat([reshape(reshape(conv_mat[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
 end
 
@@ -109,14 +109,14 @@ function convx(w, x, dy;s=(1,1),d=(1,1))
     fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]
+    cm_channels = cm_size[4]    
     conv_mat=zeros(cm_size...)
-
+    
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
     conv_mat = permutedims(conv_mat, (2,1,3,4))
     conv_mat = permutedims(conv_mat, (1,2,4,3))
     cm_size = size(conv_mat)
-    cm_channels = cm_size[4]
+    cm_channels = cm_size[4]    
 
     dy_size = size(dy)
     dy_batch=dy_size[4]
@@ -135,25 +135,25 @@ function convw(w, x, dy;s=(1,1),d=(1,1))
     fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]
+    cm_channels = cm_size[4]    
     conv_mat=zeros(cm_size...)
-
+    
     dy = permutedims(dy, (1,2,4,3))
     dy_size = size(dy)
     dy_batch=dy_size[3]
     dy_channels=dy_size[4]
     reshaped_dy = reshape(dy, (prod(size(dy)[1:2]), dy_batch, dy_channels))
-
+    
     reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))'
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
 
     dw = cat([reshape(reshape(reshaped_dy[:,:,dmi], (prod(dy_size[1:2]), dy_batch))*reshaped_x, (prod(dy_size[1:2]), prod(x_size[1:2]), x_channels, 1)) for dmi in 1:dy_channels]...,dims=4)
-
-    return col2im(dw, w, x_size[1:2], size(w)[1:2], s, d, fm_size)
+    col2im(dw, w, x_size[1:2], size(w)[1:2], s, d, fm_size)
+    return w
 end
 
 
-@primitive conv(w,x;args...),dy convx(w,x,dy;args...) convw(w,x,dy;args...) # maxpoolx(input, window, strides, dilations, y, dy)
+@primitive conv(w,x;args...),dy convw(w,x,dy;args...) convx(w,x,dy;args...) # maxpoolx(input, window, strides, dilations, y, dy)
 @zerograd convx(w,x,dy;args...)
 @zerograd convw(w,x,dy;args...)
 
@@ -234,42 +234,6 @@ end
 @primitive avgpool(input, strides, dilations),dy,y avgpoolx(input, strides, dilations, y, dy)
 @zerograd avgpoolx(input, strides, dilations, dy, y)
 
-
 "k-max operation, a is an Array and k is the maximum k element of the column"
-function kmax(a, k)
-    a_size = size(a)
-    a_cart = CartesianIndices(a)
-    d_vtbs_rows = cu(zeros(a_size[1],a_size[1]))
-    d_vtbs_cols = cu(zeros(a_size[1],a_size[1]))
-    d_c = cu(zeros(Float32, a_size[1],a_size[1]))
-    d_d = cu(zeros(a_size[1],1))
-    out_array = Array{CartesianIndex}(undef, k,a_size[2:end]...)
-
-    indices = collect(enumerate(1:a_size[1]:prod(a_size)))
-    for (ii, i) in indices
-        d_vtbs = a[i:i+a_size[1]-1]
-        i_vtbs = a_cart[i:i+a_size[1]-1]
-
-        @cuda threads=a_size[1] brows(d_vtbs_rows, d_vtbs, a_size[1])
-        @cuda threads=a_size[1] bcols(d_vtbs_cols, d_vtbs, a_size[1])
-        @cuda threads=a_size[1]^2 vcomp(d_c, d_vtbs_rows, d_vtbs_cols)
-        @cuda threads=a_size[1] csum(d_d, d_c, a_size[1])
-        d_d = a_size[1] .- d_d
-        d_o = Array(d_d)
-        ind = 1 .<= d_o .<=k
-        out_array[(ii-1)*k+1:(ii-1)*k+k] .= i_vtbs[ind[:]]
-
-        d_vtbs_rows.=0
-        d_vtbs_cols.=0
-        d_c.=0
-        d_d.=0
-    end
-
-    return CartesianIndices(out_array)
-end
+kmax(a, k::Int) = reshape([ce in sort(a[:,ci])[end-k:end] ? true : false for ci in 1:size(a)[2] for ce in a[:,ci]], size(a))
 @zerograd kmax(a, k::Int)
-
-# "k-max operation, a is an Array and k is the maximum k element of the column"
-# kmax(a, k::Int) = reshape([ce in sort(a[:,ci])[end-k:end] ? true : false for ci in 1:size(a)[2] for ce in a[:,ci]], size(a))
-
-

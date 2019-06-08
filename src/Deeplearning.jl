@@ -23,29 +23,21 @@ SOFTWARE.
 =#
 
 module Deeplearning
-	using Pkg
+	using Pkg; !(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
 	using AutoGrad
 	using LinearAlgebra
 	using Statistics
-	using CUDAdrv
-	using CUDAnative
-	using CuArrays
-	# !(haskey(Pkg.installed(), "CUDAdrv")) || using CUDAdrv
-	# !(haskey(Pkg.installed(), "CUDAnative")) || using CUDAnative
-	# !(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
 
 	include("macros.jl")
 	include("dist.jl")
 	include("data.jl")
 	include("progress.jl")
-	include("act.jl")
-	include("loss.jl")
-	include("kernel.jl")
 	include("core.jl")
 	include("interface.jl")
+	include("act.jl")
+	include("loss.jl")
 
-	export 	@float32,
-			@cudaarray,
+	export 	@cudaarray,
 			@createarray,
 			@parameters,
 			@onehot,
