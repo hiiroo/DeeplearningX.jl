@@ -32,10 +32,10 @@ module Deeplearning
 	include("dist.jl")
 	include("data.jl")
 	include("progress.jl")
-	include("act.jl")
-	include("loss.jl")
 	include("core.jl")
 	include("interface.jl")
+	include("act.jl")
+	include("loss.jl")
 
 	export 	@cudaarray,
 			@createarray,

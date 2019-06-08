@@ -26,8 +26,8 @@ SOFTWARE.
 "Sigmoid activation function."
 sigmoid(x) = 1 ./(1 .+exp.(-x))
 
-relumap(x) = Int.(map(x->x>0, x))
-@zerograd relumap(x::Any)
+relumap(x) = convert(Array{Float32},convert(BitArray, map(x->x>0, x)))
+@zerograd relumap(x)
 
 "ReLU activation function."
 function relu(x)
@@ -35,4 +35,5 @@ function relu(x)
 end
 
 "Softmax activation function."
-softmax(x) = cat([(exp10.(log.(x[:,bi])))./(sum(exp10.(log.(x[:,bi])))) for bi in 1:size(x)[end]]...,dims= 2)
+softmax(x) = cat([(exp10.((x[:,bi])))./(sum(exp10.((x[:,bi])))) for bi in 1:size(x)[end]]...,dims= 2)
+# softmax(x) = cat([(exp10.((x[:,bi])))./(sum(exp10.((x[:,bi])))) for bi in 1:size(x)[end]]...,dims= 2)

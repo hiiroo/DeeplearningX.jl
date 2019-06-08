@@ -50,7 +50,25 @@ y: Array of correct indices
 
 average: Returns count of correct classifications, average otherwise
 "
-function acc(p_y, y;average=true)
+function acc(p_y::AbstractArray, y::AbstractArray ;average=true)
     cnt = count([ci[1]==y[1] for (cii,ci) in enumerate(findmax(p_y,dims=1)[2])])
     return average ? cnt/size(p_y)[2] : cnt
+end
+
+"
+Classification accuracy
+
+m <: Network: Model
+
+d <: Data: Data to be classified
+"
+function acc(m::Network, d::Data;kwargs...)
+    total_cnt = 0
+    total_smp = 0
+    for (x_d, y_d) in d
+        total_cnt+=acc(m(x_d), y_d, average=false)
+        total_smp+=length(y_d)
+    end
+
+    return total_cnt/total_smp
 end

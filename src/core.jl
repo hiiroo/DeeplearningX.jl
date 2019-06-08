@@ -148,12 +148,12 @@ function convw(w, x, dy;s=(1,1),d=(1,1))
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
 
     dw = cat([reshape(reshape(reshaped_dy[:,:,dmi], (prod(dy_size[1:2]), dy_batch))*reshaped_x, (prod(dy_size[1:2]), prod(x_size[1:2]), x_channels, 1)) for dmi in 1:dy_channels]...,dims=4)
-    
-    return col2im(dw, w, x_size[1:2], size(w)[1:2], s, d, fm_size)
+    col2im(dw, w, x_size[1:2], size(w)[1:2], s, d, fm_size)
+    return w
 end
 
 
-@primitive conv(w,x;args...),dy convx(w,x,dy;args...) convw(w,x,dy;args...) # maxpoolx(input, window, strides, dilations, y, dy)
+@primitive conv(w,x;args...),dy convw(w,x,dy;args...) convx(w,x,dy;args...) # maxpoolx(input, window, strides, dilations, y, dy)
 @zerograd convx(w,x,dy;args...)
 @zerograd convw(w,x,dy;args...)
 
