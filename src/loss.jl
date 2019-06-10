@@ -28,6 +28,13 @@ Squared difference
 "
 squared_diff(x, y) = sum(abs2.(x-y))
 
+function nll_helper(p_y, y)
+	ba = falses(size(p_y)...)
+	[ba[y[p_s],p_s]=true for p_s in 1:size(p_y)[2]]
+	return ba
+end
+@zerograd nll_helper(p_y, y)
+
 "
 Negative Log Likelihood loss
 
@@ -35,8 +42,9 @@ p_y: 2D matrix of outputs
 
 y: Array of correct indices
 "
-function nll(p_y, y;average=true)
-    lp = [p_y[y[p_s],p_s] for p_s in 1:size(p_y)[2]]
+function nll(p_y, y; average=true)
+    # lp = [p_y[y[p_s],p_s] for p_s in 1:size(p_y)[2]]
+    lp = p_y[nll_helper(p_y, y)]
     average ? mean(lp) : sum(lp)
 end
 
@@ -65,6 +73,7 @@ d <: Data: Data to be classified
 function acc(m::Network, d::Data;kwargs...)
     total_cnt = 0
     total_smp = 0
+    
     for (x_d, y_d) in d
         total_cnt+=acc(m(x_d), y_d, average=false)
         total_smp+=length(y_d)

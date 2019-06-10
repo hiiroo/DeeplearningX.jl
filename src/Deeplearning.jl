@@ -23,7 +23,11 @@ SOFTWARE.
 =#
 
 module Deeplearning
-	using Pkg; !(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
+	# using Pkg; !(haskey(Pkg.installed(), "CuArrays")) ? using CuArrays : nothing
+	using Pkg
+	using CUDAnative
+	using CUDAdrv
+	using CuArrays
 	using AutoGrad
 	using LinearAlgebra
 	using Statistics

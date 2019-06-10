@@ -64,7 +64,7 @@ struct ConvolutionLayer
     end
   end
 end
-(c::ConvolutionLayer)(x;args...) = c.activation(conv(c.weight, x;args...) .+ c.bias)
+(c::ConvolutionLayer)(x;args...) = c.activation.(conv(c.weight, x;args...) .+ c.bias)
 
 
 "
@@ -89,7 +89,7 @@ struct FullyConnectedLayer
     end
   end
 end
-(d::FullyConnectedLayer)(x) = d.activation((d.weight*mat(x)).+d.bias)
+(d::FullyConnectedLayer)(x) = d.activation.((d.weight*mat(x)).+d.bias)
 
 "
 t->Telemetry
@@ -161,8 +161,8 @@ functn->Network as a function
 lossfn->Loss function
 "
 mutable struct Network; layers; functn; lossfn; end
-(n::Network)(x::Array) = n.functn(x)
-(n::Network)(x::Array,y::Array;kwargs...) = n.lossfn(n(x),y;kwargs...)
+(n::Network)(x::AbstractArray) = n.functn(x)
+(n::Network)(x::AbstractArray,y::AbstractArray;kwargs...) = n.lossfn(n(x),y;kwargs...)
 (n::Network)(d::Data) = mean(n(x, y) for (x,y) in d)
 Network(l,f;loss=nll) = Network(l,f,loss)
 

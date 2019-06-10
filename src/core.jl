@@ -41,7 +41,7 @@ _convolutionkernelmargin(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}
 function im2col(conv_matrix, conv_kernel, input_size::Tuple{Int, Int}, kernel_size::Tuple{Int, Int}, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int}, fm_size::Tuple{Int, Int})
     margin = input_size.%fm_size
     conv_matrix.=0
-    t1 = zeros(input_size)
+    t1 = cu(zeros(Float32, input_size))
     for ci in 1:size(conv_kernel)[4]
         for ki in 1:size(conv_kernel)[3]
             idx = 1
@@ -90,12 +90,11 @@ function conv(w, x;s=(1,1),d=(1,1))
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
     cm_channels = cm_size[4]    
-    conv_mat=zeros(cm_size...)
+    conv_mat=cu(zeros(Float32, cm_size...))
     
     reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
     
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
-    
     return reshape(cat([reshape(reshape(conv_mat[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
 end
 
@@ -110,7 +109,7 @@ function convx(w, x, dy;s=(1,1),d=(1,1))
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
     cm_channels = cm_size[4]    
-    conv_mat=zeros(cm_size...)
+    conv_mat=cu(zeros(Float32, cm_size...))
     
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
     conv_mat = permutedims(conv_mat, (2,1,3,4))
@@ -121,7 +120,6 @@ function convx(w, x, dy;s=(1,1),d=(1,1))
     dy_size = size(dy)
     dy_batch=dy_size[4]
     reshaped_dy = reshape(dy, (prod(dy_size[1:3]), dy_batch))
-
     return reshape(cat([reshape(reshape(conv_mat[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_dy, (prod(x_size[1:2]), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (x_size[1:2]..., cm_channels, x_batch))
 end
 
@@ -136,7 +134,7 @@ function convw(w, x, dy;s=(1,1),d=(1,1))
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
     cm_channels = cm_size[4]    
-    conv_mat=zeros(cm_size...)
+    conv_mat=cu(zeros(Float32, cm_size...))
     
     dy = permutedims(dy, (1,2,4,3))
     dy_size = size(dy)
@@ -191,7 +189,7 @@ function maxpool(input, window, strides, dilations)
     margin = input_size.%kernel_size
 
     y = reshape(map(opidx->maximum(input[opidx]), poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
-    return @cudaarray y
+    return cu(y)
 end
 
 function maxpoolx(input, window, strides, dilations, dy, y)
@@ -203,7 +201,7 @@ function maxpoolx(input, window, strides, dilations, dy, y)
     opidxs = poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)
     dx = zeros(input_size)
     map(opidxp->dx[opidxp[1]]=opidxp[2], zip(opidxs,y))
-    return @cudaarray dx
+    return cu(dx)
 end
 
 @primitive maxpool(input, window, strides, dilations),dy,y maxpoolx(input, window, strides, dilations, y, dy)
@@ -216,7 +214,7 @@ function avgpool(input, window, strides, dilations)
     margin = input_size.%kernel_size
 
     y = reshape(map(opidx->mean(input[opidx]), poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
-    return @cudaarray y
+    return cu(y)
 end
 
 function avgpoolx(input, window, strides, dilations, dy, y)
@@ -228,12 +226,42 @@ function avgpoolx(input, window, strides, dilations, dy, y)
     opidxs = poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)
     dx = zeros(input_size)
     map(opidxp->dx[opidxp[1]].=opidxp[2]/prod(kernel_size), zip(opidxs,y))
-    return @cudaarray dx
+    return cu(dx)
 end
 
 @primitive avgpool(input, strides, dilations),dy,y avgpoolx(input, strides, dilations, y, dy)
 @zerograd avgpoolx(input, strides, dilations, dy, y)
 
 "k-max operation, a is an Array and k is the maximum k element of the column"
-kmax(a, k::Int) = reshape([ce in sort(a[:,ci])[end-k:end] ? true : false for ci in 1:size(a)[2] for ce in a[:,ci]], size(a))
+function kmax(a, k)
+    a_size = size(a)
+    a_cart = CartesianIndices(a)
+    d_vtbs_rows = cu(zeros(a_size[1],a_size[1]))
+    d_vtbs_cols = cu(zeros(a_size[1],a_size[1]))
+    d_c = cu(zeros(Float32, a_size[1],a_size[1]))
+    d_d = cu(zeros(a_size[1],1))
+    out_array = Array{CartesianIndex}(undef, k,a_size[2:end]...)
+
+    indices = collect(enumerate(1:a_size[1]:prod(a_size)))
+    for (ii, i) in indices
+        d_vtbs = a[i:i+a_size[1]-1]
+        i_vtbs = a_cart[i:i+a_size[1]-1]
+
+        @cuda threads=a_size[1] brows(d_vtbs_rows, d_vtbs, a_size[1])
+        @cuda threads=a_size[1] bcols(d_vtbs_cols, d_vtbs, a_size[1])
+        @cuda threads=a_size[1]^2 vcomp(d_c, d_vtbs_rows, d_vtbs_cols)
+        @cuda threads=a_size[1] csum(d_d, d_c, a_size[1])
+        d_d = a_size[1] .- d_d
+        d_o = Array(d_d)
+        ind = 1 .<= d_o .<=k
+        out_array[(ii-1)*k+1:(ii-1)*k+k] .= i_vtbs[ind[:]]
+
+        d_vtbs_rows.=0
+        d_vtbs_cols.=0
+        d_c.=0
+        d_d.=0
+    end
+
+    return CartesianIndices(out_array)
+end
 @zerograd kmax(a, k::Int)

@@ -24,15 +24,10 @@ SOFTWARE.
 
 #Activation functions
 "Sigmoid activation function."
-sigmoid(x) = 1 ./(1 .+exp.(-x))
-
-relumap(x) = convert(Array{Float32},convert(BitArray, map(x->x>0, x)))
-@zerograd relumap(x)
+sigmoid(x) = 1 /(1 +exp(-x))
 
 "ReLU activation function."
-function relu(x)
-    return x.*relumap(x)
-end
+relu(x) = (x + abs(x))/2
 
 "Softmax activation function."
 softmax(x) = cat([(exp10.((x[:,bi])))./(sum(exp10.((x[:,bi])))) for bi in 1:size(x)[end]]...,dims= 2)
