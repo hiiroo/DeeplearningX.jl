@@ -1,29 +1,11 @@
 #=
-MIT License
 
 Copyright (c) 2019 Ali Mert Ceylan
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 =#
 
 function ongpu(d)
-  !(haskey(Pkg.installed(), "CuArrays")) ? cu(d) : d
+  (haskey(Pkg.installed(), "CuArrays")) ? cu(d) : d
 end
 
 
@@ -55,10 +37,11 @@ struct ConvolutionLayer
         bs = (1,1,k[3],1)
         os = (fm_size...,k[end],i[end])
 
-        (cl::ConvolutionLayer) =  new(LayerTelemetry(ws, bs, os),
-                w == nothing ? Param(ongpu(init(ws...))) : Param(ongpu(w)),
-                b == nothing ? Param(ongpu(init(bs...))) : Param(ongpu(b)),
-                act)
+        (cl::ConvolutionLayer) =  new(
+          LayerTelemetry(ws, bs, os),
+          w == nothing ? Param(ongpu(init(ws...))) : Param(ongpu(w)),
+          b == nothing ? Param(ongpu(init(bs...))) : Param(ongpu(b)),
+          act)
 
         return cl
     end
@@ -82,14 +65,58 @@ struct FullyConnectedLayer
     function d(i)
         weight_size = (n, prod(i[1:end-1]))
         fm_size = (n, 1, i[end])
-        return new(LayerTelemetry(weight_size, fm_size,  fm_size),
-            w == nothing ? Param(ongpu(init(weight_size...))) : Param(ongpu(w)),
-            b == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
-            act)
+        return new(
+          LayerTelemetry(weight_size, fm_size,  fm_size),
+          w == nothing ? Param(ongpu(init(weight_size...))) : Param(ongpu(w)),
+          b == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
+          act)
     end
   end
 end
 (d::FullyConnectedLayer)(x) = d.activation.((d.weight*mat(x)).+d.bias)
+
+
+"
+t->Telemetry
+
+"
+mutable struct RecurrentLayer
+  telemetry
+  weight
+  hweight
+  bias
+  hbias
+  activation
+  h
+  f
+
+  function RecurrentLayer(n, init, act; w=nothing, hw=nothing, b=nothing, hb=nothing)
+
+    function r(i)
+        weight_size = (n, prod(i[1:end-1]))
+        hweight_size = (n, n) #weight_size
+        fm_size = (n, 1, i[end])
+
+        function rnn(rl::RecurrentLayer, x)
+          a = (rl.weight*mat(x)).+(rl.hweight*mat(rl.h)).+rl.bias
+          rl.h = rl.activation.(a)
+          return rl.activation.(a.+rl.hbias)
+        end
+
+        return new(
+          LayerTelemetry(weight_size, fm_size,  fm_size),
+          w == nothing ? Param(ongpu(init(weight_size...))) : Param(ongpu(w)),
+          hw == nothing ? Param(ongpu(init(hweight_size...))) : Param(ongpu(hw)),
+          b == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
+          hb == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(hb)),
+          act,
+          Param(ongpu(init(n, 1))),
+          rnn)
+    end
+  end
+end
+(r::RecurrentLayer)(x) = r.f(r, x)
+
 
 "
 t->Telemetry
@@ -129,18 +156,6 @@ t->Telemetry
 struct DropoutLayer; t; f; end
 (d::DropoutLayer)(x) = d.f(x)
 Dropping(t, f) = DropoutLayer(t, f)
-=#
-#=
-"
-t->Telemetry
-
-d->Dict; for word and word vectors
-
-f->Function; embedding function
-"
-struct EmbeddingLayer; t; d; f; end
-(e::EmbeddingLayer)(x) = e.f(x)
-Embedding(t, d, f) = EmbeddingLayer(t, d, f)
 =#
 #=
 "
@@ -195,8 +210,14 @@ function Fold(d)
     end
 end
 =#
-#=
+
 "
+t->Telemetry
+
+d->Dict; for word and word vectors
+
+f->Function; embedding function
+
 Embed(s,d); Embedding layer.
 
 s: Vector size i.e. 16 if word vectors have shape of (16,1)
@@ -217,12 +238,17 @@ e1layer = Embed(16, lookup_table)()
 
 Expected output: e1layer.t.o=(16,nothing,1,1)
 "
-function Embed(s, d;args...)
-    function e(i=nothing, b=nothing)
-    	function ef(xs)
-    		return reshape(hcat([hcat([get(e.d, xi, tryparse(Float32, xi) != nothing ? e.d["<num>"] : e.d["<unk>"])  for xi in x]...) for x in xs]...), (s, length(xs[1]), 1, length(xs)))
+struct EmbeddingLayer
+  t
+  d
+  f
+  function EmbeddingLayer(s, d;kwargs...)
+    function e(i=nothing, b=nothing, dims=2)
+    	function ef(xs; dims=dims)
+    		return reshape(hcat([hcat([get(e.d, xi, tryparse(Float32, xi) != nothing ? e.d["<num>"] : e.d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
     	end
-        Embedding(LayerTelemetry(nothing, nothing, (s, i, 1, b !=nothing ? b : 1)), d, ef)
+        new(LayerTelemetry(nothing, nothing, (s, dims==2 ? i : 1, dims==3 ? i : 1, b !=nothing ? dims==4 ? i : b : 1)), d, ef)
     end
+  end
 end
-=#
+(e::EmbeddingLayer)(x; kwargs...) = e.f(x; kwargs...)
