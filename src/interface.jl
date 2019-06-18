@@ -181,7 +181,7 @@ mutable struct Network; layers; functn; lossfn; end
 (n::Network)(d::Data;kwargs...) = mean(n(x, y;kwargs...) for (x,y) in d)
 Network(l,f;loss=nll) = Network(l,f,loss)
 
-resetstates(n::Network; rf=@float32 zeros) = [:h in fieldnames(typeof(layer)) ? layer.h[:] = rf(size(layer.h)...) : nothing for layer in n.layers]
+resetstates(n::Network; rf=@float32 zeros) = [:h in fieldnames(typeof(layer)) ? layer.h .= rf(size(layer.h)...) : nothing for layer in n.layers]
 
 #=
 function Dropout(p)

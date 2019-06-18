@@ -24,9 +24,9 @@ SOFTWARE.
 
 module Deeplearning
 	using Pkg
-	using CUDAnative
-	using CUDAdrv
-	using CuArrays
+	!(haskey(Pkg.installed(), "CUDAnative")) || using CUDAnative
+	!(haskey(Pkg.installed(), "CUDAdrv")) || using CUDAdrv
+	!(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
 	using AutoGrad
 	using LinearAlgebra
 	using Statistics
@@ -43,6 +43,8 @@ module Deeplearning
 		(haskey(Pkg.installed(), "CuArrays")) ? __ongpu = d : __ongpu = -1
 		return __ongpu
 	end
+
+	!(haskey(Pkg.installed(), "CUDAnative")) || !(haskey(Pkg.installed(), "CUDAdrv")) || !(haskey(Pkg.installed(), "CuArrays")) || include("kernel.jl")
 
 	include("macros.jl")
 	include("dist.jl")

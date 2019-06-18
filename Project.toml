@@ -16,12 +16,3 @@ RDatasets = "ce6b1742-4840-55fa-b093-852dadbb1d8b"
 AutoGrad = "6710c13c-97f1-543f-91c5-74e8f7d95b35"
 
 [compat]
-CSV ="0.4"
-CUDAapi="0.5.4"
-CUDAdrv="1.0.1"
-CUDAnative="1.0.1"
-CuArrays="0.9.1"
-DataFrames="0.17.1"
-Plots="0.23.0"
-RDatasets="0.6.1"
-AutoGrad="1.1.3"
