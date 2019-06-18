@@ -110,7 +110,7 @@ mutable struct RecurrentLayer
           b == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
           hb == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(hb)),
           act,
-          Param(ongpu(init(n, 1))),
+          Param(ongpu(zeros(Float32, n, 1))),
           rnn)
     end
   end
@@ -178,8 +178,10 @@ lossfn->Loss function
 mutable struct Network; layers; functn; lossfn; end
 (n::Network)(x::AbstractArray) = n.functn(x)
 (n::Network)(x::AbstractArray,y::AbstractArray;kwargs...) = n.lossfn(n(x),y;kwargs...)
-(n::Network)(d::Data) = mean(n(x, y) for (x,y) in d)
+(n::Network)(d::Data;kwargs...) = mean(n(x, y;kwargs...) for (x,y) in d)
 Network(l,f;loss=nll) = Network(l,f,loss)
+
+resetstates(n::Network; rf=@float32 zeros) = [:h in fieldnames(typeof(layer)) ? layer.h[:] = rf(size(layer.h)...) : nothing for layer in n.layers]
 
 #=
 function Dropout(p)
