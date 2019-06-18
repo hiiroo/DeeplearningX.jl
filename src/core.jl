@@ -41,7 +41,7 @@ _convolutionkernelmargin(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}
 function im2col(conv_matrix, conv_kernel, input_size::Tuple{Int, Int}, kernel_size::Tuple{Int, Int}, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int}, fm_size::Tuple{Int, Int})
     margin = input_size.%fm_size
     conv_matrix.=0
-    t1 = cu(zeros(Float32, input_size))
+    t1 = ongpu(zeros(Float32, input_size))
     for ci in 1:size(conv_kernel)[4]
         for ki in 1:size(conv_kernel)[3]
             idx = 1
@@ -60,17 +60,17 @@ end
 
 "Fetches convolution kernel from given convolution matrix, input_size, kernel size, stride and dilation configuration"
 function col2im(conv_matrix, conv_kernel, input_size::Tuple{Int, Int}, weight_size::Tuple{Int, Int}, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int}, fm_size::Tuple{Int, Int})
+    margin = input_size.%fm_size
     kernel_size = size(conv_kernel)
-    margin = _convolutionkernelmargin(input_size, kernel_size[1:2])#
 
     conv_kernel .= 0
     for ci in 1:kernel_size[4]
         for ki in 1:kernel_size[3]
             cki = 1
-            for i in (1+margin[1]):strides[1]:(input_size[1]-margin[2])
-                for j in (1+margin[1]):strides[2]:(input_size[2]-margin[2])
-                    temp_ck = reshape(conv_matrix[cki,:,ki,ci], input_size)'[i-margin[1]:dilations[1]:(i+(margin[1])), j-margin[1]:dilations[2]:(j+(margin[1]))]
-                    conv_kernel[:,:,ki,ci].+=temp_ck'
+            for i in 1:strides[1]:(fm_size[1]*strides[1])
+                for j in 1:strides[2]:(fm_size[2]*strides[2])
+                    t1 = reshape(conv_matrix[cki,:,ki,ci], input_size[end:-1:1])
+                    conv_kernel[:,:,ki,ci].+=t1'[i:dilations[1]:(i+kernel_size[1]-1), j:dilations[2]:(j+kernel_size[2]-1)]
                     cki+=1
                 end
             end
@@ -90,7 +90,7 @@ function conv(w, x;s=(1,1),d=(1,1))
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
     cm_channels = cm_size[4]    
-    conv_mat=cu(zeros(Float32, cm_size...))
+    conv_mat=ongpu(zeros(Float32, cm_size...))
     
     reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
     
@@ -109,7 +109,7 @@ function convx(w, x, dy;s=(1,1),d=(1,1))
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
     cm_channels = cm_size[4]    
-    conv_mat=cu(zeros(Float32, cm_size...))
+    conv_mat=ongpu(zeros(Float32, cm_size...))
     
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
     conv_mat = permutedims(conv_mat, (2,1,3,4))
@@ -134,7 +134,7 @@ function convw(w, x, dy;s=(1,1),d=(1,1))
 
     cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
     cm_channels = cm_size[4]    
-    conv_mat=cu(zeros(Float32, cm_size...))
+    conv_mat=ongpu(zeros(Float32, cm_size...))
     
     dy = permutedims(dy, (1,2,4,3))
     dy_size = size(dy)
@@ -189,7 +189,7 @@ function maxpool(input, window, strides, dilations)
     margin = input_size.%kernel_size
 
     y = reshape(map(opidx->maximum(input[opidx]), poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
-    return cu(y)
+    return ongpu(y)
 end
 
 function maxpoolx(input, window, strides, dilations, dy, y)
@@ -201,7 +201,7 @@ function maxpoolx(input, window, strides, dilations, dy, y)
     opidxs = poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)
     dx = zeros(input_size)
     map(opidxp->dx[opidxp[1]]=opidxp[2], zip(opidxs,y))
-    return cu(dx)
+    return ongpu(dx)
 end
 
 @primitive maxpool(input, window, strides, dilations),dy,y maxpoolx(input, window, strides, dilations, y, dy)
@@ -214,7 +214,7 @@ function avgpool(input, window, strides, dilations)
     margin = input_size.%kernel_size
 
     y = reshape(map(opidx->mean(input[opidx]), poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
-    return cu(y)
+    return ongpu(y)
 end
 
 function avgpoolx(input, window, strides, dilations, dy, y)
@@ -226,11 +226,36 @@ function avgpoolx(input, window, strides, dilations, dy, y)
     opidxs = poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)
     dx = zeros(input_size)
     map(opidxp->dx[opidxp[1]].=opidxp[2]/prod(kernel_size), zip(opidxs,y))
-    return cu(dx)
+    return ongpu(dx)
 end
 
 @primitive avgpool(input, strides, dilations),dy,y avgpoolx(input, strides, dilations, y, dy)
 @zerograd avgpoolx(input, strides, dilations, dy, y)
+
+function kmaxvaluesv3(a::Array{T, 4}, k) where {T}
+    a_size = size(a)
+    vas = []
+    for i in 1:a_size[1]:prod(a_size)
+        va = zeros(Int64, k)
+        for avi in i:i+a_size[1]-1
+            for vai in 1:k
+                if va[vai] == 0 || a[avi] >= a[va[vai]]
+                    if va[vai] != 0
+                        insert!(va, vai, avi)
+                        va = va[1:end-1]
+                    else
+                        va[vai] = avi
+                    end
+                    break
+                end
+            end
+        end
+        push!(vas, va)
+    end
+    return reshape(hcat(vas...), (k, a_size[2:end]...))
+end
+@zerograd kmaxvaluesv3(a,k)
+
 
 "k-max operation, a is an Array and k is the maximum k element of the column"
 function kmax(a, k)
@@ -265,3 +290,16 @@ function kmax(a, k)
     return CartesianIndices(out_array)
 end
 @zerograd kmax(a, k::Int)
+
+
+function kmax_pf(x::Union{Array{T, 4}, AutoGrad.Result{Array{T,4}}}, k::Int) where {T}
+    x = permutedims(x, (2,1,3,4))
+    x = x[kmaxvaluesv3(x,k)]
+    x = permutedims(x, (2,1,3,4))
+    return x
+end
+
+
+function kmax_pf(x::Union{CuArray{T, 4}, AutoGrad.Result{CuArray{T,4}}}, k::Int) where {T}
+    return x[kmax(x,k)]
+end

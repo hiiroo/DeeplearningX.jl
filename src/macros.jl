@@ -52,7 +52,7 @@ end
 
 macro cudaarray(arr)
     quote
-        (haskey(Pkg.installed(), "CuArrays")) ? cu($(esc(arr))) : $(esc(arr))
+        gpu() > 0 ? cu($(esc(arr))) : $(esc(arr))
     end
 end
 

@@ -31,6 +31,19 @@ module Deeplearning
 	using LinearAlgebra
 	using Statistics
 
+	__ongpu = (haskey(Pkg.installed(), "CuArrays")) ? 1 : -1
+
+	function gpu()
+		global __ongpu
+		return __ongpu
+	end
+
+	function gpu(d::Int)
+		global __ongpu
+		(haskey(Pkg.installed(), "CuArrays")) ? __ongpu = d : __ongpu = -1
+		return __ongpu
+	end
+
 	include("macros.jl")
 	include("dist.jl")
 	include("data.jl")

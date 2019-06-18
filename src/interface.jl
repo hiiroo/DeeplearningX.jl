@@ -5,7 +5,7 @@ Copyright (c) 2019 Ali Mert Ceylan
 =#
 
 function ongpu(d)
-  (haskey(Pkg.installed(), "CuArrays")) ? cu(d) : d
+  gpu() > 0 ? cu(d) : d
 end
 
 
@@ -138,7 +138,7 @@ struct PoolLayer
         elseif(m==1)
           pfunc(x) = cat([cat([avgpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4)
         else
-          pfunc(x,k) = x[kmax(x,k)]
+          pfunc(x,k) = kmax_pf(x, k)
         end
 
         return new(LayerTelemetry(nothing, nothing, os), pfunc)
