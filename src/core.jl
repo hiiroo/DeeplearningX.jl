@@ -34,6 +34,7 @@ end
 _dimcheck_convolutionkernel(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}) = prod(inputsize .> kernelsize) || throw(ArgumentError("Kernel size $kernelsize cannot be larger than Input size $inputsize"))
 _kernelsize(kernelsize::Tuple{Int, Int}, dilations::Tuple{Int, Int}) = ((dilations .* kernelsize) .- (dilations.-1))
 _featuremapsize(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}, strides::Tuple{Int, Int}) = div.(inputsize .- kernelsize, strides) .+ 1
+# _featuremapsize(inputsize::Tuple, kernelsize::Tuple{Int, Int}, strides::Tuple{Int, Int}) = map(x->x[1] != nothing ? div(x[1] - x[2], x[3]) + 1 : nothing, zip(inputsize, kernelsize, strides))
 _convolutionkernelmargin(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}) = Int.(ceil.(inputsize .% kernelsize))
 
 

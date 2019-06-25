@@ -132,16 +132,21 @@ struct PoolLayer
         kernel_size = _kernelsize(w, d)
         fm_size = _featuremapsize(input_size, kernel_size, s)
         os = (fm_size..., i[end-1:end]...)
-
-        if(m==0)
-          pfunc(x) = cat([cat([maxpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4)
-        elseif(m==1)
-          pfunc(x) = cat([cat([avgpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4)
-        else
-          pfunc(x,k) = kmax_pf(x, k)
+        
+        function mode_select(m::Int)
+          if(m==0)
+            pfunc(x) = cat([cat([maxpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]...,dims=4)
+            return pfunc
+          elseif(m==1)
+            pfunc(x) = cat([cat([avgpool(x[:,:,xi,bi], w, s, d) for xi in 1:size(x)[3]]..., dims=3) for bi in 1:size(x)[4]]..., dims=4)
+            return pfunc
+          else
+            pfunc(x,k) = kmax_pf(x, k)
+            return pfunc
+          end
         end
 
-        return new(LayerTelemetry(nothing, nothing, os), pfunc)
+        return new(LayerTelemetry(nothing, nothing, os), mode_select(m))
     end
   end
 end
