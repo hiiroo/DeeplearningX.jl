@@ -31,15 +31,13 @@ function LogicalIndices(boolarr)
 end
 
 
-_dimcheck_convolutionkernel(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}) = prod(inputsize .> kernelsize) || throw(ArgumentError("Kernel size $kernelsize cannot be larger than Input size $inputsize"))
 _kernelsize(kernelsize::Tuple{Int, Int}, dilations::Tuple{Int, Int}) = ((dilations .* kernelsize) .- (dilations.-1))
-_featuremapsize(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}, strides::Tuple{Int, Int}) = div.(inputsize .- kernelsize, strides) .+ 1
-# _featuremapsize(inputsize::Tuple, kernelsize::Tuple{Int, Int}, strides::Tuple{Int, Int}) = map(x->x[1] != nothing ? div(x[1] - x[2], x[3]) + 1 : nothing, zip(inputsize, kernelsize, strides))
-_convolutionkernelmargin(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}) = Int.(ceil.(inputsize .% kernelsize))
+# _featuremapsize(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}, strides::Tuple{Int, Int}) = div.(inputsize .- kernelsize, strides) .+ 1
+_featuremapsize(inputsize, kernelsize, strides) = map(x->x[1] != nothing ? div(x[1] - x[2], x[3]) + 1 : nothing, zip(inputsize, kernelsize, strides))
 
 
 "Creates convolution matrix according to given input, kernel, stride and dilation configuration"
-function im2col(conv_matrix, conv_kernel, input_size::Tuple{Int, Int}, kernel_size::Tuple{Int, Int}, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int}, fm_size::Tuple{Int, Int})
+function im2col(conv_matrix, conv_kernel, input_size, kernel_size, strides, dilations, fm_size)
     margin = input_size.%fm_size
     conv_matrix.=0
     t1 = ongpu(zeros(Float32, input_size))
@@ -60,7 +58,7 @@ end
 
 
 "Fetches convolution kernel from given convolution matrix, input_size, kernel size, stride and dilation configuration"
-function col2im(conv_matrix, conv_kernel, input_size::Tuple{Int, Int}, weight_size::Tuple{Int, Int}, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int}, fm_size::Tuple{Int, Int})
+function col2im(conv_matrix, conv_kernel, input_size, weight_size, strides, dilations, fm_size)
     margin = input_size.%fm_size
     kernel_size = size(conv_kernel)
 
