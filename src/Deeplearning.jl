@@ -29,6 +29,7 @@ module Deeplearning
 	!(haskey(Pkg.installed(), "CuArrays")) || using CuArrays
 	using AutoGrad
 	using LinearAlgebra
+	using LinearAlgebra.BLAS
 	using Statistics
 
 	__ongpu = (haskey(Pkg.installed(), "CuArrays")) ? 1 : -1
@@ -82,5 +83,6 @@ module Deeplearning
 			progress
 
 	mat(x) = reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
+	blas_threads(x::Int) = LinearAlgebra.BLAS.set_num_threads(x)
 
 end # module
