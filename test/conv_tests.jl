@@ -33,8 +33,8 @@ module ConvolutionTests
                         0.  0.  0.  0.  0.  0.  0.  0.;
                         0.  0.  0.  0.  0.  0.  0.  0.  ]
 
-                conv = @convolve i1 w (1,1) (1,1)
-                @test conv(i1)[:,:,1,1]' == eo
+                
+                @test Deeplearning.conv(w,i1,s=(1,1),d=(1,1))[:,:,1,1]' == eo
         end
 
         function mytestfunction2()
@@ -45,8 +45,9 @@ module ConvolutionTests
                         3.  3.  5.   2.  3.  1. ;
                         3.  3.  5.   2.  3.  1.  ]
 
-                conv = @convolve i1 w (1,1) (2,2)
-                @test conv(i1)[:,:,1]' == eo
+                # conv = @convolve i1 w (1,1) (2,2)
+                # @test conv(i1)[:,:,1]' == eo
+                @test Deeplearning.conv(w,i1,s=(1,1),d=(2,2))[:,:,1,1]' == eo
         end
 
         function mytestfunction3()
@@ -55,16 +56,18 @@ module ConvolutionTests
                         6. 5. 5. 5.;
                         3. 2. 2. 2.  ]
 
-                conv = @convolve i1 w (1,1) (3,3)
-                @test conv(i1)[:,:,1,1]' == eo
+                # conv = @convolve i1 w (1,1) (3,3)
+                # @test conv(i1)[:,:,1,1]' == eo
+                @test Deeplearning.conv(w,i1,s=(1,1),d=(3,3))[:,:,1,1]' == eo
         end
 
         function mytestfunction4()
                 eo = [  5. 5.;
                         5. 5. ]
 
-                conv = @convolve i1 w (1,1) (4,4)
-                @test conv(i1)[:,:,1,1]' == eo
+                # conv = @convolve i1 w (1,1) (4,4)
+                # @test conv(i1)[:,:,1,1]' == eo
+                @test Deeplearning.conv(w,i1,s=(1,1),d=(4,4))[:,:,1,1]' == eo
         end
 
         @testset "dilated_kernel_tests" begin

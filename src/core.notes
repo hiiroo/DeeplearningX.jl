@@ -1,0 +1,8 @@
+IM2COL:
+
+- Must find a way to avoid creating an Array with size of input.
++ Add ! to function name since it modify the given array.
+
+
+COL2IM:
++ Add ! to function name since it modify the given array.

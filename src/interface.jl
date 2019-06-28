@@ -123,7 +123,7 @@ t->Telemetry
 
 "
 struct PoolLayer
-  t
+  telemetry
   f
 
   function PoolLayer(w,s,d,m)
@@ -247,8 +247,8 @@ e1layer = Embed(16, lookup_table)()
 Expected output: e1layer.t.o=(16,nothing,1,1)
 "
 struct EmbeddingLayer
-  t
-  d
+  telemetry
+  dictionary
   f
   function EmbeddingLayer(s, d;kwargs...)
     function e(i=nothing, b=nothing, dims=2)

@@ -1,0 +1,12 @@
+
++ Create supertypes; Layer and Recurrent
+
+ConvolutionLayer:
+
++ Change conv + bias with axby
+
+PoolLayer:
+
+- Move channel and batchwise operations to pool functions
+
+

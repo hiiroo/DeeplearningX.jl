@@ -91,10 +91,11 @@ function conv(w, x;s=(1,1),d=(1,1))
     cm_channels = cm_size[4]    
     conv_mat=ongpu(zeros(Float32, cm_size...))
     
-    reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
-    
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
-    return reshape(cat([reshape(reshape(conv_mat[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
+
+    reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
+    reshaped_conv_mat = reshape(conv_mat, (cm_size[1], prod(cm_size[2:3]), cm_size[4]))
+    return reshape(cat([reshape(reshaped_conv_mat[:,:,cmi]*reshaped_x, (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
 end
 
 
@@ -115,11 +116,13 @@ function convx(w, x, dy;s=(1,1),d=(1,1))
     conv_mat = permutedims(conv_mat, (1,2,4,3))
     cm_size = size(conv_mat)
     cm_channels = cm_size[4]    
+    reshaped_conv_mat = reshape(conv_mat, (cm_size[1], prod(cm_size[2:3]), cm_channels))
 
     dy_size = size(dy)
     dy_batch=dy_size[4]
     reshaped_dy = reshape(dy, (prod(dy_size[1:3]), dy_batch))
-    return reshape(cat([reshape(reshape(conv_mat[:,:,:,cmi], (cm_size[1], prod(cm_size[2:3])))*reshaped_dy, (prod(x_size[1:2]), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (x_size[1:2]..., cm_channels, x_batch))
+
+    return reshape(cat([reshape(reshaped_conv_mat[:,:,:,cmi]*reshaped_dy, (prod(x_size[1:2]), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (x_size[1:2]..., cm_channels, x_batch))
 end
 
 
@@ -144,7 +147,7 @@ function convw(w, x, dy;s=(1,1),d=(1,1))
     reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))'
     im2col(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
 
-    dw = cat([reshape(reshape(reshaped_dy[:,:,dmi], (prod(dy_size[1:2]), dy_batch))*reshaped_x, (prod(dy_size[1:2]), prod(x_size[1:2]), x_channels, 1)) for dmi in 1:dy_channels]...,dims=4)
+    dw = cat([reshape(reshaped_dy[:,:,dmi]*reshaped_x, (prod(dy_size[1:2]), prod(x_size[1:2]), x_channels, 1)) for dmi in 1:dy_channels]...,dims=4)
     col2im(dw, w, x_size[1:2], size(w)[1:2], s, d, fm_size)
     return w
 end
@@ -186,8 +189,8 @@ function maxpool(input, window, strides, dilations)
     kernel_size = _kernelsize(window, dilations)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
     margin = input_size.%kernel_size
-
-    y = reshape(map(opidx->maximum(input[opidx]), poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
+    
+    y = reshape(map(opidx->maximum(input[opidx]), poolidxs(findmaxidxs, input, window, strides, dilations, input_size, kernel_size, margin)), (fm_size...))
     return ongpu(y)
 end
 
@@ -212,7 +215,7 @@ function avgpool(input, window, strides, dilations)
     fm_size = _featuremapsize(input_size, kernel_size, strides)
     margin = input_size.%kernel_size
 
-    y = reshape(map(opidx->mean(input[opidx]), poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)), fm_size)
+    y = reshape(map(opidx->mean(input[opidx]), poolidxs(findmeanidxs, input, window, strides, dilations, input_size, kernel_size, margin)), (fm_size...))
     return ongpu(y)
 end
 
