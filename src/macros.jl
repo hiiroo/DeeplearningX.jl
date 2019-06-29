@@ -38,10 +38,7 @@ julia> xavierfloat32(4,5)
 0.388128   0.244012    0.303878  -0.421147    0.0951707
 0.139119  -0.402997    0.165534  -0.270187   -0.217053
 "
-macro float32(f)
-    g(x...) = eval(Expr(:call, f, Float32, x...))
-    g
-end
+
 
 macro createarray(sz)
     quote

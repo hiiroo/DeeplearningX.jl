@@ -110,7 +110,7 @@ mutable struct RecurrentLayer
           b == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
           hb == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(hb)),
           act,
-          Param(ongpu(zeros(Float32, n, 1))),
+          Param(ongpu(mzerosf32(n, 1))),
           rnn)
     end
   end
@@ -186,7 +186,7 @@ mutable struct Network; layers; functn; lossfn; end
 (n::Network)(d::Data;kwargs...) = mean(n(x, y;kwargs...) for (x,y) in d)
 Network(l,f;loss=nll) = Network(l,f,loss)
 
-resetstates(n::Network; rf=@float32 zeros) = [:h in fieldnames(typeof(layer)) ? layer.h = rf(size(layer.h)...) : nothing for layer in n.layers]
+resetstates(n::Network; rf=mzerosf32) = [:h in fieldnames(typeof(layer)) ? layer.h = rf(size(layer.h)...) : nothing for layer in n.layers]
 @zerograd resetstates(n; kwargs...)
 
 #=

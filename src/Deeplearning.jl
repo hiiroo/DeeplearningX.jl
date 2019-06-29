@@ -31,6 +31,7 @@ module Deeplearning
 	using LinearAlgebra
 	using LinearAlgebra.BLAS
 	using Statistics
+	using Memoize
 
 	__ongpu = (haskey(Pkg.installed(), "CuArrays")) ? 1 : -1
 
@@ -46,6 +47,22 @@ module Deeplearning
 	end
 
 	!(haskey(Pkg.installed(), "CUDAnative")) || !(haskey(Pkg.installed(), "CUDAdrv")) || !(haskey(Pkg.installed(), "CuArrays")) || include("kernel.jl")
+
+	macro float32(f)
+	    g(x...) = eval(Expr(:call, f, Float32, x...))
+	    g
+	end
+
+	mat(x) = reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
+	blas_threads(x::Int) = LinearAlgebra.BLAS.set_num_threads(x)
+
+	@memoize Dict function memoize(a)
+		a
+	end
+
+	zerosf32 = @float32 zeros
+	mzerosf32 = memoize(zerosf32)
+	mzeros = memoize(zeros)
 
 	include("macros.jl")
 	include("dist.jl")
@@ -81,8 +98,5 @@ module Deeplearning
 			minibatch,
 			repeat,
 			progress
-
-	mat(x) = reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
-	blas_threads(x::Int) = LinearAlgebra.BLAS.set_num_threads(x)
 
 end # module
