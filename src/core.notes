@@ -2,7 +2,7 @@
 
 IM2COL:
 
-- Must find a way to avoid creating an Array with size of input.
++ Must find a way to avoid creating an Array with size of input. Update: Memoized, but not effective!
 + Add ! to function name since it modify the given array.
 
 

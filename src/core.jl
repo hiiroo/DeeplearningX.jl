@@ -32,7 +32,6 @@ end
 
 
 _kernelsize(kernelsize::Tuple{Int, Int}, dilations::Tuple{Int, Int}) = ((dilations .* kernelsize) .- (dilations.-1))
-# _featuremapsize(inputsize::Tuple{Int, Int}, kernelsize::Tuple{Int, Int}, strides::Tuple{Int, Int}) = div.(inputsize .- kernelsize, strides) .+ 1
 _featuremapsize(inputsize, kernelsize, strides) = map(x->x[1] != nothing ? div(x[1] - x[2], x[3]) + 1 : nothing, zip(inputsize, kernelsize, strides))
 
 
@@ -80,75 +79,68 @@ end
 
 
 function conv(w, x;s=(1,1),d=(1,1))
-    x_size = size(x)
-    x_channels = x_size[3]
-    x_batch = x_size[4]
+    wm, wn, wc, wb = size(w)
+    xm, xn, xc, xb = size(x)
 
-    kernel_size = _kernelsize(size(w)[1:2], d)
-    fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
+    kmm, kmn = _kernelsize((wm, wn), d)
+    fmm, fmn = _featuremapsize((xm, xn), (kmm, kmn), s)
 
-    cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]    
-    conv_mat=ongpu(mzerosf32(cm_size...))
+    cmm, cmn, cmc, cmb = (fmm*fmn, xm*xn, wc, wb)
+    conv_mat = ongpu(mzerosf32(cmm, cmn, cmc, cmb))
     
-    im2col!(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
+    im2col!(conv_mat, w, (xm, xn), (kmm, kmn), s, d, (fmm, fmn))
 
-    reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))
-    reshaped_conv_mat = reshape(conv_mat, (cm_size[1], prod(cm_size[2:3]), cm_size[4]))
-    return reshape(cat([reshape(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_x), (prod(fm_size), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (fm_size..., cm_channels, x_batch))
+    reshaped_x = reshape(x, (xm*xn*xc, xb))
+    reshaped_conv_mat = reshape(conv_mat, (cmm, cmn*cmc, cmb))
+    return reshape(cat([reshape(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_x), (fmm*fmn, 1, xb)) for cmi in 1:cmb]...,dims=2), (fmm, fmn, cmb, xb))
 end
 
 
 function convx(w, x, dy;s=(1,1),d=(1,1))
-    x_size = size(x)
-    x_channels = x_size[3]
-    x_batch = x_size[4]
+    wm, wn, wc, wb = size(w)
+    xm, xn, xc, xb = size(x)
 
-    kernel_size = _kernelsize(size(w)[1:2], d)
-    fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
+    kmm, kmn = _kernelsize((wm, wn), d)
+    fmm, fmn = _featuremapsize((xm, xn), (kmm, kmn), s)
 
-    cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]    
-    conv_mat=ongpu(mzerosf32(cm_size...))
+    cmm, cmn, cmc, cmb = (fmm*fmn, xm*xn, wc, wb)
+    conv_mat = ongpu(mzerosf32(cmm, cmn, cmc, cmb))
     
-    im2col!(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
-    conv_mat = permutedims(conv_mat, (2,1,3,4))
-    conv_mat = permutedims(conv_mat, (1,2,4,3))
-    cm_size = size(conv_mat)
-    cm_channels = cm_size[4]    
-    reshaped_conv_mat = reshape(conv_mat, (cm_size[1], prod(cm_size[2:3]), cm_channels))
+    im2col!(conv_mat, w, (xm, xn), (kmm, kmn), s, d, (fmm, fmn))
+    permutedims!(conv_mat, (2,1,3,4))
+    permutedims!(conv_mat, (1,2,4,3))
 
-    dy_size = size(dy)
-    dy_batch=dy_size[4]
-    reshaped_dy = reshape(dy, (prod(dy_size[1:3]), dy_batch))
+    cmm, cmn, cmc, cmb = size(conv_mat)
+
+    reshaped_conv_mat = reshape(conv_mat, (cmm, cmn*cmc, cmb))
+
+    dym, dyn, dyc, dyb = size(dy)
+    reshaped_dy = reshape(dy, (dym*dyn*dyc, dyb))
     
-    return reshape(cat([reshape(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_dy), (prod(x_size[1:2]), 1, x_batch)) for cmi in 1:cm_channels]...,dims=2), (x_size[1:2]..., cm_channels, x_batch))
+    return reshape(cat([reshape(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_dy), (xm*xn, 1, xb)) for cmi in 1:cmb]...,dims=2), (xm, xn, cmb, xb))
 end
 
 
 function convw(w, x, dy;s=(1,1),d=(1,1))
-    x_size = size(x)
-    x_channels = x_size[3]
-    x_batch = x_size[4]
+    wm, wn, wc, wb = size(w)
+    xm, xn, xc, xb = size(x)
 
-    kernel_size = _kernelsize(size(w)[1:2], d)
-    fm_size = _featuremapsize(x_size[1:2], kernel_size, s)
+    km, kn = _kernelsize((wm, wn), d)
+    fmm, fmn = _featuremapsize((xm, xn), (km, kn), s)
 
-    cm_size = (prod(fm_size), prod(x_size[1:2]), size(w)[3:end]...)
-    cm_channels = cm_size[4]    
-    conv_mat=ongpu(mzerosf32(cm_size...))
+    cmm, cmn, cmc, cmb = (fmm*fmn, xm*xn, wc, wb)  
+    conv_mat=ongpu(mzerosf32(cmm, cmn, cmc, cmb))
     
-    dy = permutedims(dy, (1,2,4,3))
-    dy_size = size(dy)
-    dy_batch=dy_size[3]
-    dy_channels=dy_size[4]
-    reshaped_dy = reshape(dy, (prod(size(dy)[1:2]), dy_batch, dy_channels))
+    permutedims!(dy, (1,2,4,3))
+    dym, dyn, dyc, dyb = size(dy)
+
+    reshaped_dy = reshape(dy, (dym*dyn, dyb, dyc))
     
-    reshaped_x = reshape(x, (prod(size(x)[1:3]), x_batch))'
-    im2col!(conv_mat, w, x_size[1:2], kernel_size, s, d, fm_size)
+    reshaped_x = reshape(x, (xm*xn*xc, xb))'
+    im2col!(conv_mat, w, (xm, xn), (km, kn), s, d, (fmm, fmn))
     
-    dw = cat([reshape(gemm('N', 'N', Float32(1), reshaped_dy[:,:,dmi], reshaped_x), (prod(dy_size[1:2]), prod(x_size[1:2]), x_channels, 1)) for dmi in 1:dy_channels]...,dims=4)
-    col2im!(dw, w, x_size[1:2], size(w)[1:2], s, d, fm_size)
+    dw = cat([reshape(gemm('N', 'N', Float32(1), reshaped_dy[:,:,dmi], reshaped_x), (dym*dyn, xm*xn, xc, 1)) for dmi in 1:dyc]...,dims=4)
+    col2im!(dw, w, (xm, xn), size(w)[1:2], s, d, (fmm, fmn))
     return w
 end
 
@@ -160,22 +152,17 @@ end
 
 #Pooling operations
 
-function findmaxidxs(x, xis)
-    xis[findmax(x)[2]]
-end
-
-function findmeanidxs(x, xis)
-    xis
-end
+findmaxidxs(x, xis) = xis[findmax(x)[2]]
+findmeanidxs(x, xis) = xis
 
 function poolidxs(op::Function, input, window::Tuple{Int, Int}, strides::Tuple{Int, Int}, dilations::Tuple{Int, Int}, input_size::Tuple{Int, Int}, kernel_size::Tuple{Int, Int}, margin::Tuple{Int, Int})
     api = CartesianIndices(input_size)
     ap = []
     @inbounds for i in 1:strides[2]:(input_size[2]-margin[2])
         @inbounds for j in 1:strides[1]:(input_size[1]-margin[1])
-            @views t1 = input[j:dilations[2]:(j+kernel_size[2]-1), i:dilations[1]:(i+kernel_size[1]-1)]
-            @views t1idxs = api[j:dilations[2]:(j+kernel_size[2]-1), i:dilations[1]:(i+kernel_size[1]-1)]
-            @views opidxs = op(t1, t1idxs)
+            t1 = input[j:dilations[2]:(j+kernel_size[2]-1), i:dilations[1]:(i+kernel_size[1]-1)]
+            t1idxs = api[j:dilations[2]:(j+kernel_size[2]-1), i:dilations[1]:(i+kernel_size[1]-1)]
+            opidxs = op(t1, t1idxs)
             push!(ap, opidxs)
         end
     end

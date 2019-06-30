@@ -22,6 +22,7 @@ module ConvolutionTests
         i1 = i1'
         i1 = reshape(i1, (10,10,1,1))
         i1 = @cudaarray i1
+        i1 = Array{Float32}(i1)
 
         function mytestfunction()
                 eo = [  0.  0.  0.  0.  0.  0.  0.  0.;
