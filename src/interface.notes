@@ -10,3 +10,6 @@ PoolLayer:
 - Move channel and batchwise operations to pool functions
 
 
+EmbeddingLayer:
+
+- Make tryparse zerograd # didnt work out

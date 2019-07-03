@@ -53,6 +53,7 @@ module Deeplearning
 	    g
 	end
 
+	dir(path...) = joinpath(dirname(@__DIR__),path...)
 	mat(x) = reshape(x,(prod(size(x)[1:end-1]),size(x)[end]))
 	blas_threads(x::Int) = LinearAlgebra.BLAS.set_num_threads(x)
 

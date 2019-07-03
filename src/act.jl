@@ -24,10 +24,10 @@ SOFTWARE.
 
 #Activation functions
 "Sigmoid activation function."
-sigmoid(x) = 1 /(1 +exp(-x))
+sigmoid(x) = 1/(1+exp(-x))
 
 "ReLU activation function."
-relu(x) = (x + abs(x))/2
+relu(x) = max(0,x)
 
 "Softmax activation function."
 softmax(x) = cat([(exp10.((x[:,bi])))./(sum(exp10.((x[:,bi])))) for bi in 1:size(x)[end]]...,dims= 2)

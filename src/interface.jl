@@ -180,10 +180,16 @@ functn->Network as a function
 
 lossfn->Loss function
 "
+# mutable struct Network; layers; functn; lossfn; end
+# (n::Network)(x::AbstractArray) = n.functn(x)
+# (n::Network)(x::AbstractArray,y::AbstractArray;kwargs...) = n.lossfn(n(x),y;kwargs...)
+# (n::Network)(d::Data;kwargs...) = mean(n(x, y;kwargs...) for (x,y) in d)
+# Network(l,f;loss=nll) = Network(l,f,loss)
+
 mutable struct Network; layers; functn; lossfn; end
-(n::Network)(x::AbstractArray) = n.functn(x)
-(n::Network)(x::AbstractArray,y::AbstractArray;kwargs...) = n.lossfn(n(x),y;kwargs...)
-(n::Network)(d::Data;kwargs...) = mean(n(x, y;kwargs...) for (x,y) in d)
+(n::Network)(x) = n.functn(n,x)
+(n::Network)(x,y;kwargs...) = n.lossfn(n.functn(n,x),y;kwargs...)
+(n::Network)(d::Deeplearning.Data;kwargs...) = mean(n(x,y;kwargs...) for (x,y) in d)
 Network(l,f;loss=nll) = Network(l,f,loss)
 
 resetstates(n::Network; rf=mzerosf32) = [:h in fieldnames(typeof(layer)) ? layer.h = rf(size(layer.h)...) : nothing for layer in n.layers]
@@ -218,6 +224,28 @@ function Fold(d)
     end
 end
 =#
+
+# function ef(xs, s, d; dims=4)
+#   return reshape(hcat([hcat([get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
+# end
+# 
+# function efd(xs, s, d, dy; kwargs...)
+#   return [[get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x] for x in xs]
+# end
+# 
+# @primitive ef(xs, s, d;kwargs...),dy efd(xs, s, d, dy;kwargs...)
+# 
+# struct EmbeddingLayer
+#   telemetry
+#   dictionary
+#   f
+#   function EmbeddingLayer(s, d;kwargs...)
+#     function e(i=nothing, b=nothing, dims=2)
+#       return new(LayerTelemetry(nothing, nothing, (s, dims==2 ? i : 1, dims==3 ? i : 1, b !=nothing ? dims==4 ? i : b : 1)), d, ef)
+#     end
+#   end
+# end
+# (e::EmbeddingLayer)(x, s; kwargs...) = e.f(x, s, e.dictionary; kwargs...)
 
 "
 t->Telemetry
@@ -255,7 +283,7 @@ struct EmbeddingLayer
     	function ef(xs; dims=dims)
     		return reshape(hcat([hcat([get(e.d, xi, tryparse(Float32, xi) != nothing ? e.d["<num>"] : e.d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
     	end
-        new(LayerTelemetry(nothing, nothing, (s, dims==2 ? i : 1, dims==3 ? i : 1, b !=nothing ? dims==4 ? i : b : 1)), d, ef)
+      return new(LayerTelemetry(nothing, nothing, (s, dims==2 ? i : 1, dims==3 ? i : 1, b !=nothing ? dims==4 ? i : b : 1)), d, ef)
     end
   end
 end
