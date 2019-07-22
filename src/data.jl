@@ -23,6 +23,9 @@ The Knet.jl package is licensed under the MIT "Expat" License:
 > SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 =#
 
+# Modified for Deeplearning by Ali Mert Ceylan
+
+
 using Random
 import Base: length, size, iterate, eltype, IteratorSize, IteratorEltype, haslength, @propagate_inbounds, repeat, rand, tail
 import .Iterators: cycle, Cycle

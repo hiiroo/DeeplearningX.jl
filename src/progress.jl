@@ -25,6 +25,7 @@ The Knet.jl package is licensed under the MIT "Expat" License:
 
 # Based on https://github.com/cloud-oak/Tqdm.jl by @cloud-oak under Mozilla Public License 2.0
 # Modified for Knet by Deniz Yuret
+# Modified for Deeplearning by Ali Mert Ceylan
 
 using Printf
 import Base: length, size, iterate, eltype, IteratorSize, IteratorEltype, haslength, @propagate_inbounds

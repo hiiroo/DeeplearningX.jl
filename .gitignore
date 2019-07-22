@@ -4,3 +4,5 @@
 *-checkpoint.ipynb
 .ipynb_checkpoints/*
 deps/deps.jl
+*.iml
+*.xml
