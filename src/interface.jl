@@ -67,8 +67,8 @@ struct FullyConnectedLayer
         fm_size = (n, 1, i[end])
         return new(
           LayerTelemetry(weight_size, fm_size,  fm_size),
-          w == nothing ? Param(ongpu(init(weight_size...))) : Param(ongpu(w)),
-          b == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
+          w === nothing ? Param(ongpu(init(weight_size...))) : Param(ongpu(w)),
+          b === nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
           act)
     end
   end
@@ -105,10 +105,10 @@ mutable struct RecurrentLayer
 
         return new(
           LayerTelemetry(weight_size, fm_size,  fm_size),
-          w == nothing ? Param(ongpu(init(weight_size...))) : Param(ongpu(w)),
-          hw == nothing ? Param(ongpu(init(hweight_size...))) : Param(ongpu(hw)),
-          b == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
-          hb == nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(hb)),
+          w === nothing ? Param(ongpu(init(weight_size...))) : Param(ongpu(w)),
+          hw === nothing ? Param(ongpu(init(hweight_size...))) : Param(ongpu(hw)),
+          b === nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(b)),
+          hb === nothing ? Param(ongpu(init(fm_size[1:end-1]...))) : Param(ongpu(hb)),
           act,
           Param(ongpu(mzerosf32(n, 1))),
           rnn)
@@ -225,27 +225,15 @@ function Fold(d)
 end
 =#
 
-# function ef(xs, s, d; dims=4)
-#   return reshape(hcat([hcat([get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
-# end
-# 
-# function efd(xs, s, d, dy; kwargs...)
-#   return [[get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x] for x in xs]
-# end
-# 
-# @primitive ef(xs, s, d;kwargs...),dy efd(xs, s, d, dy;kwargs...)
-# 
-# struct EmbeddingLayer
-#   telemetry
-#   dictionary
-#   f
-#   function EmbeddingLayer(s, d;kwargs...)
-#     function e(i=nothing, b=nothing, dims=2)
-#       return new(LayerTelemetry(nothing, nothing, (s, dims==2 ? i : 1, dims==3 ? i : 1, b !=nothing ? dims==4 ? i : b : 1)), d, ef)
-#     end
-#   end
-# end
-# (e::EmbeddingLayer)(x, s; kwargs...) = e.f(x, s, e.dictionary; kwargs...)
+function ef(xs, s, d; dims=4)
+  return reshape(hcat([hcat([get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
+end
+
+function efd(xs, s, d, dy; kwargs...)
+  return [[get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x] for x in xs]
+end
+
+@primitive ef(xs, s, d;kwargs...),dy efd(xs, s, d, dy;kwargs...)
 
 "
 t->Telemetry
@@ -280,11 +268,52 @@ struct EmbeddingLayer
   f
   function EmbeddingLayer(s, d;kwargs...)
     function e(i=nothing, b=nothing, dims=2)
-    	function ef(xs; dims=dims)
-    		return reshape(hcat([hcat([get(e.d, xi, tryparse(Float32, xi) != nothing ? e.d["<num>"] : e.d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
-    	end
       return new(LayerTelemetry(nothing, nothing, (s, dims==2 ? i : 1, dims==3 ? i : 1, b !=nothing ? dims==4 ? i : b : 1)), d, ef)
     end
   end
 end
-(e::EmbeddingLayer)(x; kwargs...) = e.f(x; kwargs...)
+(e::EmbeddingLayer)(x, s; kwargs...) = e.f(x, s, e.dictionary; kwargs...)
+
+# OLD CODES
+
+# "
+# t->Telemetry
+
+# d->Dict; for word and word vectors
+
+# f->Function; embedding function
+
+# Embed(s,d); Embedding layer.
+
+# s: Vector size i.e. 16 if word vectors have shape of (16,1)
+
+# d: Dict; dictionary aka lookup table for words to corresponding vectors
+
+# Usage:
+
+# If sentences have the same length they can be given as minibatches to layer.
+
+# e1layer = Embed(16, lookup_table)(11, 100)
+
+# Expected output: e1layer.t.o=(16,11,1,100)
+
+# In an online learning setup, using minibatches won't be possible since sentence lengths will not be same, for that case;
+
+# e1layer = Embed(16, lookup_table)()
+
+# Expected output: e1layer.t.o=(16,nothing,1,1)
+# "
+# # struct EmbeddingLayer
+# #   telemetry
+# #   dictionary
+# #   f
+# #   function EmbeddingLayer(s, d;kwargs...)
+# #     function e(i=nothing, b=nothing, dims=2)
+# #     	function ef(xs; dims=dims)
+# #     		return reshape(hcat([hcat([get(e.d, xi, tryparse(Float32, xi) != nothing ? e.d["<num>"] : e.d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
+# #     	end
+# #       return new(LayerTelemetry(nothing, nothing, (s, dims==2 ? i : 1, dims==3 ? i : 1, b !=nothing ? dims==4 ? i : b : 1)), d, ef)
+# #     end
+# #   end
+# # end
+# # (e::EmbeddingLayer)(x; kwargs...) = e.f(x; kwargs...)

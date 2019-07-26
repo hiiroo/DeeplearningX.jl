@@ -107,8 +107,8 @@ function convx(w, x, dy;s=(1,1),d=(1,1))
     conv_mat = ongpu(mzerosf32(cmm, cmn, cmc, cmb))
     
     im2col!(conv_mat, w, (xm, xn), (kmm, kmn), s, d, (fmm, fmn))
-    permutedims!(conv_mat, (2,1,3,4))
-    permutedims!(conv_mat, (1,2,4,3))
+    conv_mat = permutedims(conv_mat, (2,1,3,4))
+    conv_mat = permutedims(conv_mat, (1,2,4,3))
 
     cmm, cmn, cmc, cmb = size(conv_mat)
 
@@ -131,7 +131,8 @@ function convw(w, x, dy;s=(1,1),d=(1,1))
     cmm, cmn, cmc, cmb = (fmm*fmn, xm*xn, wc, wb)  
     conv_mat=ongpu(mzerosf32(cmm, cmn, cmc, cmb))
     
-    permutedims!(dy, (1,2,4,3))
+    # permutedims!(dy, (1,2,4,3))
+    dy = permutedims(dy, (1,2,4,3))
     dym, dyn, dyc, dyb = size(dy)
 
     reshaped_dy = reshape(dy, (dym*dyn, dyb, dyc))
