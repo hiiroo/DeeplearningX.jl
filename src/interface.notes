@@ -9,7 +9,10 @@ PoolLayer:
 
 - Move channel and batchwise operations to pool functions
 
+RecurrentLayer:
+
+- I should be able to add more hiddenlayers
 
 EmbeddingLayer:
 
-- Make tryparse zerograd # didnt work out
+x Make tryparse zerograd # didnt work out

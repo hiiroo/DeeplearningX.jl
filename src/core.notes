@@ -1,4 +1,4 @@
-- Make all arrays with generic types T that will refer to Float32 or 64
+x Make all arrays with generic types T that will refer to Float32 or 64
 
 IM2COL:
 

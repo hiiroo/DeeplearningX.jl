@@ -1,9 +1,0 @@
-CSV 0.4.3
-CUDAapi 0.5.4
-CUDAdrv 1.0.1
-CUDAnative 1.0.1
-CuArrays 0.9.1
-DataFrames 0.17.1
-Plots 0.23.0
-RDatasets 0.6.1
-AutoGrad 1.1.3

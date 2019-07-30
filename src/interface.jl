@@ -276,33 +276,33 @@ end
 
 # OLD CODES
 
-# "
-# t->Telemetry
+"
+t->Telemetry
 
-# d->Dict; for word and word vectors
+d->Dict; for word and word vectors
 
-# f->Function; embedding function
+f->Function; embedding function
 
-# Embed(s,d); Embedding layer.
+Embed(s,d); Embedding layer.
 
-# s: Vector size i.e. 16 if word vectors have shape of (16,1)
+s: Vector size i.e. 16 if word vectors have shape of (16,1)
 
-# d: Dict; dictionary aka lookup table for words to corresponding vectors
+d: Dict; dictionary aka lookup table for words to corresponding vectors
 
-# Usage:
+Usage:
 
-# If sentences have the same length they can be given as minibatches to layer.
+If sentences have the same length they can be given as minibatches to layer.
 
-# e1layer = Embed(16, lookup_table)(11, 100)
+e1layer = Embed(16, lookup_table)(11, 100)
 
-# Expected output: e1layer.t.o=(16,11,1,100)
+Expected output: e1layer.t.o=(16,11,1,100)
 
-# In an online learning setup, using minibatches won't be possible since sentence lengths will not be same, for that case;
+In an online learning setup, using minibatches won't be possible since sentence lengths will not be same, for that case;
 
-# e1layer = Embed(16, lookup_table)()
+e1layer = Embed(16, lookup_table)()
 
-# Expected output: e1layer.t.o=(16,nothing,1,1)
-# "
+Expected output: e1layer.t.o=(16,nothing,1,1)
+"
 # # struct EmbeddingLayer
 # #   telemetry
 # #   dictionary
