@@ -39,8 +39,8 @@ struct ConvolutionLayer
 
         (cl::ConvolutionLayer) =  new(
           LayerTelemetry(ws, bs, os),
-          w == nothing ? Param(ongpu(init(ws...))) : Param(ongpu(w)),
-          b == nothing ? Param(ongpu(init(bs...))) : Param(ongpu(b)),
+          w === nothing ? Param(ongpu(init(ws...))) : Param(ongpu(w)),
+          b === nothing ? Param(ongpu(init(bs...))) : Param(ongpu(b)),
           act)
 
         return cl
