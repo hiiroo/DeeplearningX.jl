@@ -65,6 +65,10 @@ module Deeplearning
 	mzerosf32 = memoize(zerosf32)
 	mzeros = memoize(zeros)
 
+	@zerograd zerosf32(args...;kwargs...)
+	@zerograd mzerosf32(args...;kwargs...)
+	@zerograd mzeros(args...;kwargs...)
+
 	include("macros.jl")
 	include("dist.jl")
 	include("data.jl")

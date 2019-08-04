@@ -192,8 +192,8 @@ mutable struct Network; layers; functn; lossfn; end
 (n::Network)(d::Deeplearning.Data;kwargs...) = mean(n(x,y;kwargs...) for (x,y) in d)
 Network(l,f;loss=nll) = Network(l,f,loss)
 
-resetstates(n::Network; rf=mzerosf32) = [:h in fieldnames(typeof(layer)) ? layer.h = rf(size(layer.h)...) : nothing for layer in n.layers]
-@zerograd resetstates(n; kwargs...)
+resetstates(n::Network) = [if (:h in fieldnames(typeof(layer))) layer.h .= 0; end for layer in n.layers]
+@zerograd resetstates(n)
 
 #=
 function Dropout(p)
@@ -276,33 +276,6 @@ end
 
 # OLD CODES
 
-"
-t->Telemetry
-
-d->Dict; for word and word vectors
-
-f->Function; embedding function
-
-Embed(s,d); Embedding layer.
-
-s: Vector size i.e. 16 if word vectors have shape of (16,1)
-
-d: Dict; dictionary aka lookup table for words to corresponding vectors
-
-Usage:
-
-If sentences have the same length they can be given as minibatches to layer.
-
-e1layer = Embed(16, lookup_table)(11, 100)
-
-Expected output: e1layer.t.o=(16,11,1,100)
-
-In an online learning setup, using minibatches won't be possible since sentence lengths will not be same, for that case;
-
-e1layer = Embed(16, lookup_table)()
-
-Expected output: e1layer.t.o=(16,nothing,1,1)
-"
 # # struct EmbeddingLayer
 # #   telemetry
 # #   dictionary
