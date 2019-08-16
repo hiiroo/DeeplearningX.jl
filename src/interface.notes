@@ -1,9 +1,9 @@
 
-+ Create supertypes; Layer and Recurrent
+- Create supertypes; Layer and Recurrent
 
 ConvolutionLayer:
 
-+ Change conv + bias with axby
+- Change conv + bias with axby
 
 PoolLayer:
 

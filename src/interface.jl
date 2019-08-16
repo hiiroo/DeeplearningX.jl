@@ -229,11 +229,13 @@ function ef(xs, s, d; dims=4)
   return reshape(hcat([hcat([get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
 end
 
-function efd(xs, s, d, dy; kwargs...)
-  return [[get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x] for x in xs]
-end
+@zerograd ef(xs, s, d;kwargs...)
 
-@primitive ef(xs, s, d;kwargs...),dy efd(xs, s, d, dy;kwargs...)
+#  function efd(xs, s, d, dy; kwargs...)
+#    return [[get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x] for x in xs]
+#  end
+#
+#  @primitive ef(xs, s, d;kwargs...),dy efd(xs, s, d, dy;kwargs...)
 
 "
 t->Telemetry
