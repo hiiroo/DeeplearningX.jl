@@ -26,11 +26,11 @@ SOFTWARE.
 "
 Squared difference
 "
-squared_diff(x, y) = sum(abs2.(x-y))
+squared_diff(x, y) = sum(abs2.(x - y))
 
 function nll_helper(p_y, y)
 	ba = falses(size(p_y)...)
-	[ba[y[p_s],p_s]=true for p_s in 1:size(p_y)[2]]
+	[ba[y[p_s],p_s] = true for p_s in 1:size(p_y)[2]]
 	return ba
 end
 @zerograd nll_helper(p_y, y)
@@ -42,7 +42,7 @@ p_y: 2D matrix of outputs
 
 y: Array of correct indices
 "
-function nll(p_y, y; average=true)
+function nll(p_y, y; average = true)
     lp = p_y[nll_helper(p_y, y)]
     average ? mean(lp) : sum(lp)
 end
@@ -57,9 +57,9 @@ y: Array of correct indices
 
 average: Returns count of correct classifications, average otherwise
 "
-function acc(p_y::AbstractArray, y::AbstractArray ;average=true)
-    cnt = count([ci[1]==y[1] for (cii,ci) in enumerate(findmax(p_y,dims=1)[2])])
-    return average ? cnt/size(p_y)[2] : cnt
+function acc(p_y::AbstractArray, y::AbstractArray ;average = true)
+    cnt = count([ci[1] == y[1] for (cii, ci) in enumerate(findmax(p_y, dims = 1)[2])])
+    return average ? cnt / size(p_y)[2] : cnt
 end
 
 "
@@ -74,9 +74,9 @@ function acc(m::Network, d::Data;kwargs...)
     total_smp = 0
     
     for (x_d, y_d) in d
-        total_cnt+=acc(m(x_d), y_d, average=false)
-        total_smp+=length(y_d)
+        total_cnt += acc(m(x_d), y_d, average = false)
+        total_smp += length(y_d)
     end
 
-    return total_cnt/total_smp
+    return total_cnt / total_smp
 end

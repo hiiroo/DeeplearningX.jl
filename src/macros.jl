@@ -68,7 +68,7 @@ macro onehot(l)
     quote
         array = collect(Set($(esc(l))))
         one_hots = zeros(length(array), length(array))
-        one_hots[diagind(one_hots)].=1
+        one_hots[diagind(one_hots)] .= 1
         d = Dict([array[i] => @cudaarray one_hots[1:end,i] for i in 1:size(one_hots)[2]])
         dr = Dict(Int.(collect(value)) => key for (key, value) in d)
         (d, dr)
@@ -82,7 +82,7 @@ macro onehotencode(d, l)
 end
 
 function decodeonehot(dr, o)
-    outkey = collect(Int.(o.==maximum(o)))[:]
+    outkey = collect(Int.(o .== maximum(o)))[:]
     outkey in keys(dr) ? dr[outkey] : nothing
 end
 
