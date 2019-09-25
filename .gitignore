@@ -6,3 +6,4 @@
 deps/deps.jl
 *.iml
 *.xml
+.vscode/*
