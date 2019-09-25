@@ -92,7 +92,8 @@ function conv(w, x;s = (1, 1),d = (1, 1))
 
     reshaped_x = reshape(x, (xm * xn * xc, xb))
     reshaped_conv_mat = reshape(conv_mat, (cmm, cmn * cmc, cmb))
-    return reshape(cat([reshape(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_x), (fmm * fmn, 1, xb)) for cmi in 1:cmb]..., dims = 2), (fmm, fmn, cmb, xb))
+    # return reshape(cat([reshape(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_x), (fmm * fmn, 1, xb)) for cmi in 1:cmb]..., dims = 2), (fmm, fmn, cmb, xb))
+    return reshape(catcat([expanddims(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_x), 2) for cmi in 1:cmb]..., dims = 2), (fmm, fmn, cmb, xb))
 end
 
 
@@ -117,7 +118,8 @@ function convx(w, x, dy;s = (1, 1),d = (1, 1))
     dym, dyn, dyc, dyb = size(dy)
     reshaped_dy = reshape(dy, (dym * dyn * dyc, dyb))
     
-    return reshape(cat([reshape(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_dy), (xm * xn, 1, xb)) for cmi in 1:cmb]..., dims = 2), (xm, xn, cmb, xb))
+    # return reshape(cat([reshape(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_dy), (xm * xn, 1, xb)) for cmi in 1:cmb]..., dims = 2), (xm, xn, cmb, xb))
+    return reshape(catcat([expanddims(gemm('N', 'N', Float32(1), reshaped_conv_mat[:,:,cmi], reshaped_dy), 2) for cmi in 1:cmb]..., dims = 2), (xm, xn, cmb, xb))
 end
 
 
@@ -140,13 +142,14 @@ function convw(w, x, dy;s = (1, 1),d = (1, 1))
     reshaped_x = reshape(x, (xm * xn * xc, xb))'
     im2col!(conv_mat, w, (xm, xn), (km, kn), s, d, (fmm, fmn))
     
-    dw = cat([reshape(gemm('N', 'N', Float32(1), reshaped_dy[:,:,dmi], reshaped_x), (dym * dyn, xm * xn, xc, 1)) for dmi in 1:dyc]..., dims = 4)
+    # dw = cat([reshape(gemm('N', 'N', Float32(1), reshaped_dy[:,:,dmi], reshaped_x), (dym * dyn, xm * xn, xc, 1)) for dmi in 1:dyc]..., dims = 4)
+    dw = catcat([gemm('N', 'N', Float32(1), reshaped_dy[:,:,dmi], reshaped_x) for dmi in 1:dyc]..., dims = 4)
     col2im!(dw, w, (xm, xn), size(w)[1:2], s, d, (fmm, fmn))
     return w
 end
 
 
-    @primitive conv(w, x;args...), dy convw(w, x, dy;args...) convx(w, x, dy;args...) # maxpoolx(input, window, strides, dilations, y, dy)
+@primitive conv(w, x;args...), dy convw(w, x, dy;args...) convx(w, x, dy;args...) # maxpoolx(input, window, strides, dilations, y, dy)
 @zerograd convx(w, x, dy;args...)
 @zerograd convw(w, x, dy;args...)
 

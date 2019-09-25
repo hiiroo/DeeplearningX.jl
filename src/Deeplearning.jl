@@ -31,6 +31,7 @@ module Deeplearning
 	using LinearAlgebra
 	using LinearAlgebra.BLAS
 	using Statistics
+	using CatViews; import CatViews.CatView
 	using Memoize
 
 	__ongpu = (haskey(Pkg.installed(), "CuArrays")) ? 1 : -1
@@ -104,4 +105,5 @@ module Deeplearning
 			repeat,
 			progress
 
+	CatView(a::AutoGrad.Result...) = CatView(value.(a))
 end # module

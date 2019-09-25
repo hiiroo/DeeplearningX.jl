@@ -71,7 +71,7 @@ module ConvolutionTests
                 @test Deeplearning.conv(w,i1,s=(1,1),d=(4,4))[:,:,1,1]' == eo
         end
 
-        @testset "dilated_kernel_tests" begin
+        @testset "dilated_conv" begin
                 mytestfunction()
                 mytestfunction2()
                 mytestfunction3()

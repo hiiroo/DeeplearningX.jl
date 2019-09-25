@@ -225,11 +225,12 @@ function Fold(d)
 end
 =#
 
-function ef(xs, s, d; dims=4)
-  return reshape(hcat([hcat([get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
+function ef(xs, d; dims = 2)
+  return catcat([catcat([get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x]..., dims=dims) for x in xs]..., dims = 4)
+  # return reshape(hcat([hcat([get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x]...) for x in xs]...), (s, dims==2 ? length(xs[1]) : 1, dims==3 ? length(xs[1]) : 1, dims==4 ? length(xs[1])*length(xs) : length(xs)))
 end
 
-@zerograd ef(xs, s, d;kwargs...)
+@zerograd ef(xs, d;kwargs...)
 
 #  function efd(xs, s, d, dy; kwargs...)
 #    return [[get(d, xi, tryparse(Float32, xi) != nothing ? d["<num>"] : d["<unk>"])  for xi in x] for x in xs]
@@ -244,11 +245,11 @@ d->Dict; for word and word vectors
 
 f->Function; embedding function
 
-Embed(s,d); Embedding layer.
+EmbeddingLayer(s, d); Embedding layer.
 
-s: Vector size i.e. 16 if word vectors have shape of (16,1)
+s: Vector size, i.e. 16 if word vectors have shape of (16,1)
 
-d: Dict; dictionary aka lookup table for words to corresponding vectors
+d: Dict; dictionary, aka lookup table for words to corresponding vectors
 
 Usage:
 
@@ -274,7 +275,7 @@ struct EmbeddingLayer
     end
   end
 end
-(e::EmbeddingLayer)(x, s; kwargs...) = e.f(x, s, e.dictionary; kwargs...)
+(e::EmbeddingLayer)(x;kwargs...) = e.f(x, e.dictionary; kwargs...)
 
 # OLD CODES
 
