@@ -38,10 +38,11 @@ _featuremapsize(inputsize, kernelsize, strides) = map(x->x[1] != nothing ? div(x
 "Creates convolution matrix according to given input, kernel, stride and dilation configuration"
 function im2col!(conv_matrix, conv_kernel, input_size, kernel_size, strides, dilations, fm_size)
     margin = input_size .% fm_size
+    kernel_size = size(conv_kernel)
     conv_matrix .= 0
     t1 = ongpu(mzerosf32(input_size))
-    for ci in 1:size(conv_kernel)[4]
-        for ki in 1:size(conv_kernel)[3]
+    for ci in 1:kernel_size[4]
+        for ki in 1:kernel_size[3]
             idx = 1
             for i in 1:strides[1]:(fm_size[1] * strides[1])
                 for j in 1:strides[2]:(fm_size[2] * strides[2])
@@ -146,7 +147,7 @@ function convw(w, x, dy;s = (1, 1),d = (1, 1))
 end
 
 
-    @primitive conv(w, x;args...), dy convw(w, x, dy;args...) convx(w, x, dy;args...) # maxpoolx(input, window, strides, dilations, y, dy)
+@primitive conv(w, x;args...), dy convw(w, x, dy;args...) convx(w, x, dy;args...) # maxpoolx(input, window, strides, dilations, y, dy)
 @zerograd convx(w, x, dy;args...)
 @zerograd convw(w, x, dy;args...)
 

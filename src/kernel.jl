@@ -3,6 +3,8 @@
 Copyright (c) 2019 Ali Mert Ceylan
 
 =#
+#CUDANative kernel reside here.
+
 
 function vcomp(c, a, b)
     i = (blockIdx().x-1) * blockDim().x + threadIdx().x
